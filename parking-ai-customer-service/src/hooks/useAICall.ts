@@ -90,7 +90,7 @@ export const useAICall = () => {
       setCallState('connecting');
       setError(null);
 
-      const response = await axios.post('http://localhost:4000/api/start-call', {
+      const response = await axios.post('http://localhost:3000/api/start-call', {
         userId
       });
 
