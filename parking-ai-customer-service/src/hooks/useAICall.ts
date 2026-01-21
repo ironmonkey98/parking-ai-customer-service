@@ -450,6 +450,28 @@ export const useAICall = () => {
       console.error('[WebSocket] Connection error:', error);
     });
 
+    // 监听会话被拒绝事件
+    socket.on('session-rejected', ({ sessionId, message }: { sessionId: string; message: string }) => {
+      console.log('[WebSocket] Session rejected:', sessionId, message);
+
+      // 重置转人工状态
+      setHumanTakeover(prev => ({
+        ...prev,
+        isWaitingHuman: false,
+        isTransferring: false,
+        sessionId: null,
+        queuePosition: 0,
+        estimatedWaitTime: 0,
+      }));
+
+      // 添加系统消息通知用户
+      setMessages(prev => [...prev, {
+        id: uuidv4(),
+        role: 'ai',
+        content: message || '当前客服繁忙，请稍后重试或继续与AI客服对话',
+      }]);
+    });
+
     // 监听客服接入成功事件（方案 B）
     socket.on('takeover-success', async (data: any) => {
       console.log('[Takeover Success] Received:', data);

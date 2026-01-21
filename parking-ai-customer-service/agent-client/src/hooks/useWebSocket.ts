@@ -93,6 +93,20 @@ export const useWebSocket = () => {
       setLastEndedSessionId(payload.sessionId);
       pushEvent(payload.message || `会话超时: ${payload.sessionId}`);
     });
+
+    // 监听会话消息更新（智能体回调推送的实时对话）
+    socket.on('session-message-update', ({ sessionId, message }: { sessionId: string; message: any }) => {
+      setPendingSessions(prev => prev.map(s => {
+        if (s.sessionId === sessionId) {
+          return {
+            ...s,
+            conversationHistory: [...(s.conversationHistory || []), message]
+          };
+        }
+        return s;
+      }));
+      pushEvent(`会话 ${sessionId.substring(0, 8)} 新消息: ${message.role === 'user' ? '用户' : 'AI'}`);
+    });
   }, [handleNewSession, handlePendingSessions, pushEvent, removeSession]);
 
   const disconnect = useCallback(() => {

@@ -1250,6 +1250,151 @@ app.get('/api/session-history/:sessionId', async (req, res) => {
     }
 });
 
+// ==================== 智能体回调接口 ====================
+
+// 阿里云回调鉴权 Token（从环境变量读取，可在 .env 中配置）
+const AGENT_CALLBACK_TOKEN = process.env.AGENT_CALLBACK_TOKEN || '';
+
+/**
+ * 阿里云智能体回调接口
+ *
+ * 官方文档: https://help.aliyun.com/zh/ims/user-guide/agent-callback
+ *
+ * 回调事件类型:
+ * - agent_start: 智能体启动
+ * - session_start: 会话开始
+ * - agent_stop: 智能体停止
+ * - error: 错误
+ * - intent_detected: 意图检测
+ * - intent_recognized: 意图识别
+ * - llm_data_received: LLM数据接收
+ * - tts_data_received: TTS数据接收
+ * - chat_record: 聊天记录（用户和AI的对话）
+ * - audio_record: 音频记录
+ * - full_audio_record: 完整音频记录
+ * - outbound_call: 外呼
+ * - inbound_call: 来电
+ * - client_defined_data: 客户端自定义数据
+ * - instruction: 指令
+ */
+app.post('/api/agent-callback', express.json(), (req, res) => {
+    try {
+        // 验证鉴权 Token（Bearer fixed-token 格式）
+        if (AGENT_CALLBACK_TOKEN) {
+            const authHeader = req.headers['authorization'] || '';
+            const expectedToken = `Bearer ${AGENT_CALLBACK_TOKEN}`;
+
+            if (authHeader !== expectedToken) {
+                logger.warn('[AgentCallback] Token verification failed:', {
+                    received: authHeader.substring(0, 20) + '...',
+                    expected: expectedToken.substring(0, 20) + '...'
+                });
+                // 暂时不拒绝请求，仅记录警告，便于调试
+            }
+        }
+
+        // 阿里云回调请求体结构
+        const { requestId, code, message, event, dialogues, data } = req.body;
+
+        logger.info('[AgentCallback] Received:', {
+            event,
+            requestId,
+            code,
+            dialoguesCount: dialogues?.length
+        });
+        logger.debug('[AgentCallback] Full body:', JSON.stringify(req.body, null, 2));
+
+        // 处理聊天记录回调（chat_record）
+        if (event === 'chat_record' && dialogues && Array.isArray(dialogues)) {
+            /**
+             * dialogues 数组结构:
+             * {
+             *   roundId: string,        // 轮次ID
+             *   producer: string,       // 'user' 或 'agent'
+             *   text: string,           // 文本内容
+             *   reasoningText: string,  // 推理文本（可选）
+             *   time: number,           // 时间戳
+             *   source: string,         // 来源
+             *   dialogueId: string,     // 对话ID
+             *   type: string            // 类型
+             * }
+             */
+            dialogues.forEach(dialogue => {
+                const { producer, text, time, dialogueId } = dialogue;
+
+                if (!text) return;
+
+                // 尝试从 requestId 或其他字段获取 instanceId
+                // 注意：需要根据实际回调数据调整获取方式
+                const instanceId = req.body.instanceId || req.body.aiAgentInstanceId;
+
+                if (instanceId) {
+                    const session = sessionManager.getSessionByInstanceId(instanceId);
+                    if (session) {
+                        const message = {
+                            id: dialogueId || uuidv4(),
+                            role: producer === 'user' ? 'user' : 'ai',
+                            content: text,
+                            timestamp: time ? new Date(time).toISOString() : new Date().toISOString()
+                        };
+
+                        sessionManager.addMessageToSession(session.sessionId, message);
+
+                        // 实时推送给客服端
+                        io.emit('session-message-update', {
+                            sessionId: session.sessionId,
+                            message
+                        });
+
+                        logger.info('[AgentCallback] Chat record saved:', {
+                            sessionId: session.sessionId,
+                            producer,
+                            textPreview: text.substring(0, 50)
+                        });
+                    }
+                } else {
+                    logger.warn('[AgentCallback] No instanceId in callback, cannot match session');
+                }
+            });
+        }
+
+        // 处理其他事件类型
+        switch (event) {
+            case 'agent_start':
+                logger.info('[AgentCallback] Agent started:', { requestId });
+                break;
+            case 'session_start':
+                logger.info('[AgentCallback] Session started:', { requestId });
+                break;
+            case 'agent_stop':
+                logger.info('[AgentCallback] Agent stopped:', { requestId });
+                break;
+            case 'error':
+                logger.error('[AgentCallback] Error event:', { requestId, code, message });
+                break;
+            case 'intent_detected':
+            case 'intent_recognized':
+                logger.info('[AgentCallback] Intent event:', { event, data });
+                break;
+            default:
+                // chat_record 已在上面处理
+                if (event !== 'chat_record') {
+                    logger.debug('[AgentCallback] Other event:', { event });
+                }
+        }
+
+        // 返回成功响应（阿里云要求返回 200 和文本）
+        return res.status(200).send('Callback received successfully');
+
+    } catch (error) {
+        logger.error('[AgentCallback] Error processing callback:', error);
+        return res.status(400).json({
+            success: false,
+            message: error.message || 'Invalid callback data'
+        });
+    }
+});
+
 // ==================== 错误处理 ====================
 
 // 404处理

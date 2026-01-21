@@ -58,6 +58,41 @@ class SessionManager {
   }
 
   /**
+   * 根据 userSocketId 获取会话
+   * 用于用户断开连接时清理会话
+   * @param {string} socketId - 用户的 Socket ID
+   * @returns {Object|null} 会话对象或 null
+   */
+  getSessionBySocketId(socketId) {
+    for (const [sessionId, session] of this.sessions) {
+      if (session.userSocketId === socketId) {
+        return session;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 向会话添加消息记录
+   * 用于智能体回调时保存对话历史
+   * @param {string} sessionId - 会话 ID
+   * @param {Object} message - 消息对象 { id, role, content, timestamp }
+   * @returns {boolean} 是否添加成功
+   */
+  addMessageToSession(sessionId, message) {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      if (!session.conversationHistory) {
+        session.conversationHistory = [];
+      }
+      session.conversationHistory.push(message);
+      console.log(`[SessionManager] Message added to session ${sessionId}, role: ${message.role}`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * 更新会话
    * @param {Object} updates - 更新的字段
    * @returns {boolean} 是否更新成功

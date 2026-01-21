@@ -136,24 +136,34 @@ function initWebSocket(httpServer) {
         return;
       }
 
-      // 将会话重新加入队列末尾
       const session = sessionManager.getSession(sessionId);
-
-      if (session) {
-        queueManager.enqueue(session);
-        console.log(`[WebSocket] Session ${sessionId} requeued after rejection`);
+      if (!session) {
+        console.warn(`[WebSocket] Session not found for rejection: ${sessionId}`);
+        return;
       }
 
-      // 尝试分配给其他客服
-      const nextAvailableAgent = agentStatusManager.getAvailableAgent();
+      // 从队列中移除会话（而不是重新加入队列）
+      queueManager.removeSession(sessionId);
 
-      if (nextAvailableAgent) {
-        const nextSession = queueManager.dequeue();
+      // 更新会话状态为已拒绝
+      sessionManager.updateSession(sessionId, {
+        status: 'rejected',
+        rejectedAt: new Date(),
+        rejectReason: reason || '客服繁忙'
+      });
 
-        if (nextSession) {
-          io.to(nextAvailableAgent.socketId).emit('new-session', nextSession);
-        }
-      }
+      // 通知用户端：请求被拒绝
+      io.emit('session-rejected', {
+        sessionId,
+        reason: reason || '客服繁忙',
+        message: '当前客服繁忙，请稍后重试或继续与AI客服对话'
+      });
+
+      // 更新所有客服的待处理会话列表
+      const pendingSessions = queueManager.getAllSessions();
+      broadcastToAgents(io, 'pending-sessions', pendingSessions);
+
+      console.log(`[WebSocket] Session ${sessionId} rejected and removed from queue`);
     });
 
     // 客服挂断通话
@@ -181,6 +191,32 @@ function initWebSocket(httpServer) {
     socket.on('disconnect', () => {
       console.log('[WebSocket] Client disconnected:', socket.id);
 
+      // ========================================
+      // 1. 检查是否是用户断开连接（用户刷新页面等场景）
+      // ========================================
+      const userSession = sessionManager.getSessionBySocketId(socket.id);
+      if (userSession && userSession.status === 'waiting_human') {
+        console.log(`[WebSocket] Cleaning up user session: ${userSession.sessionId}`);
+
+        // 从队列中移除
+        queueManager.removeSession(userSession.sessionId);
+
+        // 更新会话状态
+        sessionManager.updateSession(userSession.sessionId, {
+          status: 'user_disconnected',
+          endedAt: new Date()
+        });
+
+        // 通知所有客服更新列表
+        const pendingSessions = queueManager.getAllSessions();
+        broadcastToAgents(io, 'pending-sessions', pendingSessions);
+
+        console.log(`[WebSocket] User session ${userSession.sessionId} cleaned up`);
+      }
+
+      // ========================================
+      // 2. 检查是否是客服断开连接
+      // ========================================
       const agent = agentStatusManager.getAgentBySocketId(socket.id);
 
       if (agent) {

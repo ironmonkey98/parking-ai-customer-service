@@ -76,6 +76,15 @@ class QueueManager {
   }
 
   /**
+   * 从队列中移除特定会话（别名方法，用于拒绝会话等场景）
+   * @param {string} sessionId - 会话 ID
+   * @returns {boolean} 是否移除成功
+   */
+  removeSession(sessionId) {
+    return this.remove(sessionId);
+  }
+
+  /**
    * 查看队列中的下一个会话（不移除）
    * @returns {Object|null} 会话对象或 null
    */

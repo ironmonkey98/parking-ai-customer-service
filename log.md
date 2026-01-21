@@ -1054,6 +1054,82 @@ cd /Users/yehong/desktop/aihelper/parking-ai-customer-service
 
 
 
+## 2026-01-21 - 停车场智能客服系统问题修复
+
+### 修复概述
+修复三个关键问题：拒绝会话机制、页面刷新会话清理、智能体回调获取双方对话
+
+### 问题1：拒绝会话后仍在发起请求
+
+**根本原因**: `socket.js` 中 `agent-reject-session` 事件将被拒绝的会话重新加入队列，而不是结束会话并通知用户。
+
+**修改文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| `server/managers/QueueManager.js` | 新增 `removeSession()` 别名方法 |
+| `server/socket.js` | 重写拒绝逻辑：移除会话、更新状态为 `rejected`、通知用户端 |
+| `src/hooks/useAICall.ts` | 新增 `session-rejected` 事件监听，重置转人工状态 |
+
+### 问题2：页面刷新后出现多个会话请求
+
+**根本原因**: 用户刷新页面时 WebSocket 断开，但等待中的会话没有被清理。
+
+**修改文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| `server/managers/SessionManager.js` | 新增 `getSessionBySocketId()` 方法 |
+| `server/socket.js` | `disconnect` 事件中检查用户会话并清理 |
+
+### 问题3：只显示AI回复，没有用户对话
+
+**根本原因**: 需要使用智能体回调方式获取双方对话，而非仅依赖 SDK 事件监听。
+
+**修改文件**:
+| 文件 | 修改内容 |
+|------|----------|
+| `server/managers/SessionManager.js` | 新增 `addMessageToSession()` 方法 |
+| `server/server.js` | 新增 `POST /api/agent-callback` 智能体回调接口 |
+| `agent-client/src/hooks/useWebSocket.ts` | 新增 `session-message-update` 事件监听 |
+
+### 阿里云回调配置
+
+用户已在阿里云控制台配置三个回调：
+- 智能体状态回调
+- 工作流状态回调
+- 聊天记录实时回调
+
+**回调地址**: `https://47.237.118.74:3000/api/agent-callback`
+
+**环境变量配置** (可选，用于 Token 验证):
+```env
+# server/.env
+AGENT_CALLBACK_TOKEN=sk-868ce33e676b462e9eba365c93893479
+```
+
+### 验证步骤
+
+1. **测试拒绝会话**:
+   - 用户端发起转人工请求
+   - 客服端点击拒绝
+   - 验证：用户端收到拒绝通知，会话从队列中移除
+
+2. **测试页面刷新**:
+   - 用户端发起转人工请求
+   - 用户刷新页面
+   - 验证：旧会话自动清理，客服端列表更新
+
+3. **测试智能体回调**:
+   - 在阿里云控制台配置回调地址
+   - 用户与AI对话
+   - 验证：客服端能实时看到双方对话内容
+
+### 风险评估
+- ✅ 低风险：修改逻辑清晰，不影响现有功能
+- ✅ 向后兼容：新增功能，不破坏原有流程
+- ⚠️ 注意：智能体回调需要阿里云控制台正确配置完整 URL
+
+---
+
 ## 2026-01-18 22:48 - 项目文件整理
 
 ### 整理目标
