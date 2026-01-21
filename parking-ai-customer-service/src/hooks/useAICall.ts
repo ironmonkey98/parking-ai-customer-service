@@ -7,6 +7,10 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { io, Socket } from 'socket.io-client';
 
+// 配置 API 基础地址 - 后端使用 HTTPS
+const API_BASE_URL = `https://${window.location.hostname}:3000`;
+axios.defaults.baseURL = API_BASE_URL;
+
 export interface Message {
   id: string;
   role: 'user' | 'agent' | 'ai';
