@@ -2,13 +2,13 @@ import axios from 'axios';
 import type { SessionHistoryResponse, TakeoverAcceptResponse } from '../types';
 
 // 自动检测主机地址和协议，支持局域网远程访问
+// 后端使用 HTTPS，强制使用 https 协议连接
 const getApiBaseUrl = () => {
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL;
   }
-  const protocol = window.location.protocol; // http: 或 https:
   const hostname = window.location.hostname;
-  return `${protocol}//${hostname}:3000`;
+  return `https://${hostname}:3000`;
 };
 
 const apiBaseUrl = getApiBaseUrl();

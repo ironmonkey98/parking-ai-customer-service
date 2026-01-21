@@ -3,9 +3,8 @@ import { io, type Socket } from 'socket.io-client';
 import type { AgentInfo, AgentStatus, SessionSummary } from '../types';
 
 // 自动检测主机地址和协议，支持局域网远程访问
-// HTTPS 页面使用 wss://，HTTP 页面使用 ws://
-const wsProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-const socketUrl = import.meta.env.VITE_WS_URL || `${wsProtocol}//${window.location.hostname}:3000`;
+// 后端使用 HTTPS，强制使用 https 协议连接
+const socketUrl = import.meta.env.VITE_WS_URL || `https://${window.location.hostname}:3000`;
 
 export const useWebSocket = () => {
   const socketRef = useRef<Socket | null>(null);

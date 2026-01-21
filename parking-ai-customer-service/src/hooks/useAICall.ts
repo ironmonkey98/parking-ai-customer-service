@@ -419,9 +419,8 @@ export const useAICall = () => {
   }, [engine]);
 
   useEffect(() => {
-    // 自动检测主机地址和协议，支持局域网远程访问
-    const wsProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:3000`;
+    // 后端使用 HTTPS，强制使用 https 协议连接
+    const wsUrl = `https://${window.location.hostname}:3000`;
 
     console.log('[WebSocket] Connecting to:', wsUrl);
 
