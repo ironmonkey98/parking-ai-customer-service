@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAICall } from './hooks/useAICall';
 import { AICallAgentState } from 'aliyun-auikit-aicall';
 import './App.css';

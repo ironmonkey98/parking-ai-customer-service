@@ -8,7 +8,7 @@ yarn.lock
 .env.local
 
 # Build
-dist/
+# dist/  # 临时注释，用于部署
 build/
 
 # IDE
