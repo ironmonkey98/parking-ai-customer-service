@@ -1294,68 +1294,125 @@ app.post('/api/agent-callback', express.json(), (req, res) => {
         }
 
         // 阿里云回调请求体结构
-        const { requestId, code, message, event, dialogues, data } = req.body;
+        // 根据官方文档，instanceId 应该在顶层
+        const {
+            requestId,
+            code,
+            message,
+            event,
+            dialogues,
+            data,
+            instanceId: topLevelInstanceId,  // 顶层 instanceId
+            aiAgentId,
+            extenddData  // 注意：阿里云文档中是 extenddData（两个d）
+        } = req.body;
+
+        // 尝试从多个位置获取 instanceId
+        const instanceId = topLevelInstanceId ||
+                          req.body.aiAgentInstanceId ||
+                          data?.instanceId ||
+                          extenddData?.instanceId;
 
         logger.info('[AgentCallback] Received:', {
             event,
             requestId,
             code,
+            instanceId: instanceId || 'NOT_FOUND',
+            aiAgentId,
             dialoguesCount: dialogues?.length
         });
-        logger.debug('[AgentCallback] Full body:', JSON.stringify(req.body, null, 2));
+
+        // ✅ 始终打印完整回调数据用于调试
+        logger.info('[AgentCallback] Full body:', JSON.stringify(req.body, null, 2));
 
         // 处理聊天记录回调（chat_record）
         if (event === 'chat_record' && dialogues && Array.isArray(dialogues)) {
             /**
-             * dialogues 数组结构:
+             * dialogues 数组结构（根据阿里云文档）:
              * {
              *   roundId: string,        // 轮次ID
              *   producer: string,       // 'user' 或 'agent'
              *   text: string,           // 文本内容
-             *   reasoningText: string,  // 推理文本（可选）
-             *   time: number,           // 时间戳
-             *   source: string,         // 来源
+             *   reasoningText: string,  // 推理文本（可选，AI思考过程）
+             *   time: number,           // 时间戳（毫秒）
+             *   source: string,         // 来源 'chat'
              *   dialogueId: string,     // 对话ID
-             *   type: string            // 类型
+             *   type: string            // 类型 'normal'
              * }
              */
-            dialogues.forEach(dialogue => {
-                const { producer, text, time, dialogueId } = dialogue;
 
-                if (!text) return;
-
-                // 尝试从 requestId 或其他字段获取 instanceId
-                // 注意：需要根据实际回调数据调整获取方式
-                const instanceId = req.body.instanceId || req.body.aiAgentInstanceId;
-
-                if (instanceId) {
-                    const session = sessionManager.getSessionByInstanceId(instanceId);
-                    if (session) {
-                        const message = {
-                            id: dialogueId || uuidv4(),
-                            role: producer === 'user' ? 'user' : 'ai',
-                            content: text,
-                            timestamp: time ? new Date(time).toISOString() : new Date().toISOString()
-                        };
-
-                        sessionManager.addMessageToSession(session.sessionId, message);
-
-                        // 实时推送给客服端
-                        io.emit('session-message-update', {
-                            sessionId: session.sessionId,
-                            message
-                        });
-
-                        logger.info('[AgentCallback] Chat record saved:', {
-                            sessionId: session.sessionId,
-                            producer,
-                            textPreview: text.substring(0, 50)
-                        });
-                    }
-                } else {
-                    logger.warn('[AgentCallback] No instanceId in callback, cannot match session');
+            // 如果有 instanceId，通过 instanceId 匹配会话
+            let session = null;
+            if (instanceId) {
+                session = sessionManager.getSessionByInstanceId(instanceId);
+                if (session) {
+                    logger.info('[AgentCallback] Found session by instanceId:', {
+                        instanceId,
+                        sessionId: session.sessionId
+                    });
                 }
-            });
+            }
+
+            // 如果没有 instanceId 或找不到会话，尝试用最近活跃的会话
+            if (!session) {
+                const allSessions = sessionManager.getAllSessions();
+                // 找到状态为 'active' 或 'waiting' 的最近会话
+                const activeSessions = allSessions.filter(s =>
+                    s.status === 'active' || s.status === 'waiting' || s.status === 'ai_talking'
+                );
+                if (activeSessions.length === 1) {
+                    // 如果只有一个活跃会话，直接使用
+                    session = activeSessions[0];
+                    logger.info('[AgentCallback] Using single active session:', {
+                        sessionId: session.sessionId,
+                        status: session.status
+                    });
+                } else if (activeSessions.length > 1) {
+                    // 多个活跃会话，使用最新的
+                    session = activeSessions.sort((a, b) =>
+                        new Date(b.createdAt) - new Date(a.createdAt)
+                    )[0];
+                    logger.warn('[AgentCallback] Multiple active sessions, using latest:', {
+                        sessionId: session.sessionId,
+                        totalActive: activeSessions.length
+                    });
+                }
+            }
+
+            if (session) {
+                dialogues.forEach(dialogue => {
+                    const { producer, text, time, dialogueId, reasoningText } = dialogue;
+
+                    if (!text) return;
+
+                    const chatMessage = {
+                        id: dialogueId || uuidv4(),
+                        role: producer === 'user' ? 'user' : 'ai',
+                        content: text,
+                        reasoningText: reasoningText || null,  // 保存 AI 推理过程
+                        timestamp: time ? new Date(time).toISOString() : new Date().toISOString()
+                    };
+
+                    sessionManager.addMessageToSession(session.sessionId, chatMessage);
+
+                    // 实时推送给客服端
+                    io.emit('session-message-update', {
+                        sessionId: session.sessionId,
+                        message: chatMessage
+                    });
+
+                    logger.info('[AgentCallback] Chat record saved:', {
+                        sessionId: session.sessionId,
+                        producer,
+                        textPreview: text.substring(0, 50)
+                    });
+                });
+            } else {
+                logger.warn('[AgentCallback] No session found for chat_record:', {
+                    instanceId: instanceId || 'NOT_PROVIDED',
+                    dialoguesCount: dialogues.length
+                });
+            }
         }
 
         // 处理其他事件类型

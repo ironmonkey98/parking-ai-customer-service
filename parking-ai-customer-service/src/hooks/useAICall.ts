@@ -89,9 +89,21 @@ export const useAICall = () => {
         });
 
         aiEngine.on('userSubtitleNotify', (data: any) => {
+          // ✅ 添加调试日志，与 agentSubtitleNotify 保持一致
+          console.log('[UserSubtitle]', {
+            text: data.text,
+            isSentenceEnd: data.isSentenceEnd,
+            end: data.end,
+            sentenceId: data.sentenceId,
+          });
+
           const text = data.text;
           setSubtitle(text);
-          if (data.isSentenceEnd) {
+
+          // ✅ 兼容两种属性名：isSentenceEnd 或 end
+          const isSentenceEnd = data.isSentenceEnd || data.end || false;
+
+          if (isSentenceEnd) {
              setMessages(prev => [...prev, {
                id: uuidv4(),
                role: 'user',

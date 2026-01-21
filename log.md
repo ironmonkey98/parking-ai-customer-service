@@ -1054,6 +1054,64 @@ cd /Users/yehong/desktop/aihelper/parking-ai-customer-service
 
 
 
+## 2026-01-21 - 修复用户语音识别结果未记录到对话历史
+
+### 问题诊断
+**发现的问题**:
+1. 用户说话内容没有被记录到 messages 数组
+   - 现象: Console 只显示 `[AgentSubtitle]` 日志，没有 `[UserSubtitle]`
+   - UI 上可以看到用户说的文字（如 "那我现在出去了怎么办?"），但没有记录
+   - 原因: SDK 事件数据结构中使用 `end` 属性而非 `isSentenceEnd`，代码只检查了 `isSentenceEnd`
+
+### 修复内容
+- 修改: `src/hooks/useAICall.ts` 第 91-121 行的 `userSubtitleNotify` 事件处理
+- 原因: 兼容 SDK 两种句子结束标记属性（`isSentenceEnd` 和 `end`）
+- 位置: `parking-ai-customer-service/src/hooks/useAICall.ts`
+- 影响: 用户语音现在会正确记录到对话历史
+- 风险: 无
+
+**修改前**:
+```typescript
+aiEngine.on('userSubtitleNotify', (data: any) => {
+  const text = data.text;
+  setSubtitle(text);
+  if (data.isSentenceEnd) {  // ⚠️ 只检查 isSentenceEnd
+    // ...
+  }
+});
+```
+
+**修改后**:
+```typescript
+aiEngine.on('userSubtitleNotify', (data: any) => {
+  // ✅ 添加调试日志
+  console.log('[UserSubtitle]', {
+    text: data.text,
+    isSentenceEnd: data.isSentenceEnd,
+    end: data.end,
+    sentenceId: data.sentenceId,
+  });
+
+  const text = data.text;
+  setSubtitle(text);
+
+  // ✅ 兼容两种属性名
+  const isSentenceEnd = data.isSentenceEnd || data.end || false;
+
+  if (isSentenceEnd) {
+    // ...
+  }
+});
+```
+
+### 验证步骤
+1. 重新构建用户端或重启开发服务器
+2. 发起 AI 通话并说话
+3. 检查 Console 是否出现 `[UserSubtitle]` 日志
+4. 验证用户消息是否出现在对话历史中
+
+---
+
 ## 2026-01-21 - 停车场智能客服系统问题修复
 
 ### 修复概述
