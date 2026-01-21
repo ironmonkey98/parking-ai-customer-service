@@ -5,11 +5,23 @@
 
 require('dotenv').config();
 const crypto = require('crypto');
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 const express = require('express');
 const cors = require('cors');
 const OpenApi = require('@alicloud/openapi-client');
 const OpenApiUtil = require('@alicloud/openapi-util').default;
 const TeaUtil = require('@alicloud/tea-util');
+
+// 导入新增的管理器和服务
+const sessionManager = require('./managers/SessionManager');
+const agentStatusManager = require('./managers/AgentStatusManager');
+const queueManager = require('./managers/QueueManager');
+const { initWebSocket, pushSessionToAgent, notifyUserTakeoverSuccess } = require('./socket');
+const { takeoverAIAgentCall } = require('./utils/takeover');
 
 // ==================== 配置 ====================
 const CONFIG = {
@@ -128,22 +140,130 @@ function createChannelId() {
     return crypto.randomBytes(16).toString('hex');
 }
 
+/**
+ * 生成阿里云 RTC Auth Token
+ *
+ * 算法文档: https://help.aliyun.com/document_detail/146833.html
+ * 官方示例: https://github.com/aliyunvideo/AliRtcAppServer/blob/master/nodejs/index.js
+ * 拼接顺序: AppID + AppKey + ChannelID + UserID + Nonce + Timestamp
+ *
+ * ⚠️ 重要: Nonce 必须以 'AK-' 前缀开头，否则加入频道验证会失败！
+ *
+ * @param {string} channelId - 频道 ID
+ * @param {string} userId - 用户 ID
+ * @param {number} timestamp - 时间戳（秒）
+ * @returns {Object} 包含 token 和 nonce 的对象
+ */
 function createRtcAuthToken(channelId, userId, timestamp) {
-    const raw = `${CONFIG.rtc.appId}${CONFIG.rtc.appKey}${channelId}${userId}${timestamp}`;
+    // ✅ 关键修复: Nonce 必须以 'AK-' 前缀开头
+    // 官方说明: "the Nonce should be prefix with 'AK-' otherwise the joining verification will failed"
+    const nonce = 'AK-' + crypto.randomUUID().replace(/-/g, '');
+
+    // 拼接顺序: AppID + AppKey + ChannelID + UserID + Nonce + Timestamp
+    const raw = `${CONFIG.rtc.appId}${CONFIG.rtc.appKey}${channelId}${userId}${nonce}${timestamp}`;
     const token = crypto.createHash('sha256').update(raw).digest('hex');
+
     const payload = {
         appid: CONFIG.rtc.appId,
         channelid: channelId,
         userid: userId,
-        nonce: '',
+        nonce: nonce,
         timestamp: timestamp,
         token: token,
     };
-    return Buffer.from(JSON.stringify(payload)).toString('base64');
+
+    return {
+        base64Token: Buffer.from(JSON.stringify(payload)).toString('base64'),
+        nonce: nonce,
+        token: token,
+    };
 }
 
-// ==================== Express应用 ====================
+/**
+ * 生成独立 RTC Token（用于真人客服通话）
+ * @param {Object} params
+ * @param {string} params.channelId - RTC 频道 ID
+ * @param {string} params.userId - 用户 ID（可以是用户端或客服端）
+ * @param {string} params.region - 区域（可选）
+ * @returns {Promise<Object>} 包含 success 和 rtcAuthToken 的结果对象
+ */
+async function getRTCToken({ channelId, userId, region }) {
+    try {
+        if (!channelId) {
+            return {
+                success: false,
+                message: 'channelId is required',
+                errorCode: 'MISSING_CHANNEL_ID',
+            };
+        }
+
+        if (!userId) {
+            return {
+                success: false,
+                message: 'userId is required',
+                errorCode: 'MISSING_USER_ID',
+            };
+        }
+
+        if (!CONFIG.rtc.appId || !CONFIG.rtc.appKey) {
+            return {
+                success: false,
+                message: 'RTC AppId/AppKey is not configured',
+                errorCode: 'RTC_NOT_CONFIGURED',
+            };
+        }
+
+        // 生成 Token，有效期 24 小时
+        const timestamp = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+        const rtcAuthToken = createRtcAuthToken(channelId, userId, timestamp);
+
+        logger.debug('[getRTCToken] Token generated:', {
+            channelId,
+            userId,
+            timestamp,
+        });
+
+        return {
+            success: true,
+            rtcAuthToken,
+            channelId,
+            userId,
+            timestamp,
+        };
+
+    } catch (error) {
+        logger.error('[getRTCToken] Failed to generate RTC token:', error);
+        return {
+            success: false,
+            message: error.message || 'Failed to generate RTC token',
+            errorCode: 'TOKEN_GENERATION_FAILED',
+        };
+    }
+}
+
+// ==================== Express应用 + WebSocket ====================
 const app = express();
+
+// 检查是否存在 HTTPS 证书（与前端共用）
+const certPath = path.resolve(__dirname, '../certs');
+const hasHttpsCerts = fs.existsSync(path.join(certPath, 'key.pem')) && fs.existsSync(path.join(certPath, 'cert.pem'));
+
+// 创建服务器（优先 HTTPS，否则回退 HTTP）
+let httpServer;
+if (hasHttpsCerts) {
+    const httpsOptions = {
+        key: fs.readFileSync(path.join(certPath, 'key.pem')),
+        cert: fs.readFileSync(path.join(certPath, 'cert.pem')),
+    };
+    httpServer = https.createServer(httpsOptions, app);
+    console.log('[Server] HTTPS 模式启用（支持局域网安全连接）');
+} else {
+    httpServer = http.createServer(app);
+    console.log('[Server] HTTP 模式（仅限 localhost）');
+}
+
+// 初始化 WebSocket 服务
+const io = initWebSocket(httpServer);
 
 // 中间件
 app.use(cors());
@@ -209,20 +329,24 @@ async function startAIAgentInstance({
     };
 
     try {
+        const apiParams = pickDefined({
+            AIAgentId: agentId,
+            UserId: userId,
+            InstanceId: instanceId,
+            Type: type,
+            Greeting: greeting,
+            WakeUpQuery: wakeUpQuery,
+            EnableIntelligentSegment: enableIntelligentSegment,
+            Config: requestConfig,
+            RuntimeConfig: toJsonString(runtimeConfig),
+        });
+
+        logger.debug('StartAIAgentInstance params:', apiParams);
+
         const response = await callIceOpenApi(
             'StartAIAgentInstance',
             resolvedRegion,
-            pickDefined({
-                AIAgentId: agentId,
-                UserId: userId,
-                InstanceId: instanceId,
-                Type: type,
-                Greeting: greeting,
-                WakeUpQuery: wakeUpQuery,
-                EnableIntelligentSegment: enableIntelligentSegment,
-                Config: requestConfig,
-                RuntimeConfig: toJsonString(runtimeConfig),
-            })
+            apiParams
         );
         const body = response?.body || {};
         const code = Number(body.Code || body.code) || 200;
@@ -245,7 +369,9 @@ async function startAIAgentInstance({
             rtcJoinToken: body.RTCJoinToken || body.rtc_join_token,
         };
     } catch (error) {
+        logger.error('startAIAgentInstance error:', error);
         const openApiError = buildOpenApiError(error, 'startAIAgentInstance failed');
+        logger.error('OpenAPI error details:', openApiError);
         return {
             code: openApiError.code,
             message: openApiError.message,
@@ -627,41 +753,40 @@ app.post('/api/start-call', async (req, res) => {
             });
         }
 
-        logger.info('Starting AI Call:', {
+        logger.info('Starting AI Call (GenerateAIAgentCall):', {
             userId,
-            instanceId,
             agentId,
             type,
         });
 
-        const result = await startAIAgentInstance({
+        // 构造运行时配置 (如果 GenerateAIAgentCall 支持 AgentConfig)
+        // 注意: GenerateAIAgentCall 的参数结构与 StartAIAgentInstance 不同
+        // 这里我们主要确保核心通话功能可用
+        const result = await generateAIAgentCall({
             userId,
             agentId,
             region,
-            instanceId,
-            type,
-            greeting: greeting || '您好,我是智能停车助手,请问有什么可以帮您?',
-            enableIntelligentSegment,
-            config,
+            // 尝试将配置作为 AgentConfig 传递 (具体结构需参考阿里云文档)
+            // 暂时只传基础参数以确保连通性
         });
 
         if (result.code !== 200) {
             return res.status(500).json({
-                error: result.message || 'Failed to start AI call',
+                error: result.message || 'Failed to generate AI agent call',
                 code: result.code,
                 requestId: result.requestId,
                 errorCode: result.errorCode,
             });
         }
 
-        logger.info('AI Call started successfully:', {
+        logger.info('AI Call generated successfully:', {
             instanceId: result.instanceId,
-            rtcChannelId: result.rtcChannelId,
+            rtcChannelId: result.channelId,
         });
 
         res.json({
-            rtcChannelId: result.rtcChannelId,
-            rtcJoinToken: result.rtcJoinToken,
+            rtcChannelId: result.channelId,
+            rtcJoinToken: result.rtcAuthToken,
             agentId: agentId,
             instanceId: result.instanceId,
         });
@@ -763,6 +888,368 @@ app.post('/api/get-token', async (req, res) => {
     }
 });
 
+// ==================== 真人接管相关API ====================
+
+/**
+ * 用户请求转人工
+ * 触发场景：
+ * 1. 用户主动点击"转人工"按钮
+ * 2. 关键词触发
+ * 3. AI 智能判断建议转人工
+ */
+app.post('/api/request-human-takeover', async (req, res) => {
+    try {
+        const {
+            instanceId,
+            userId,
+            channelId,
+            reason = 'user_requested', // 'user_requested' | 'ai_suggested' | 'keyword_detected'
+            keyword,
+            conversationHistory = [],
+        } = req.body;
+
+        // 参数验证
+        if (!instanceId) {
+            return res.status(400).json({
+                success: false,
+                message: 'instanceId is required',
+            });
+        }
+
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'userId is required',
+            });
+        }
+
+        if (!channelId) {
+            return res.status(400).json({
+                success: false,
+                message: 'channelId is required',
+            });
+        }
+
+        logger.info('[HumanTakeover] User requested human takeover:', {
+            instanceId,
+            userId,
+            reason,
+            keyword,
+            conversationHistoryCount: conversationHistory?.length || 0, // ✅ 调试：打印对话历史数量
+        });
+
+        // 调试：打印对话历史内容
+        if (conversationHistory && conversationHistory.length > 0) {
+            logger.debug('[HumanTakeover] Conversation history:', JSON.stringify(conversationHistory, null, 2));
+        } else {
+            logger.warn('[HumanTakeover] No conversation history received!');
+        }
+
+        // 生成会话 ID
+        const sessionId = uuidv4();
+
+        // 创建会话记录
+        const session = {
+            sessionId,
+            instanceId,
+            channelId,
+            userId,
+            status: 'waiting_human',
+            conversationHistory,
+            transferReason: reason,
+            keyword: keyword || null,
+            createdAt: new Date(),
+        };
+
+        // 保存到会话管理器
+        sessionManager.saveSession(session);
+
+        // 尝试推送给可用客服
+        const pushed = pushSessionToAgent(io, session);
+
+        if (pushed) {
+            logger.info(`[HumanTakeover] Session ${sessionId} pushed to available agent`);
+
+            return res.json({
+                success: true,
+                message: '正在为您转接人工客服...',
+                data: {
+                    sessionId,
+                    status: 'waiting_human',
+                    queuePosition: 0, // 已分配给客服，不在队列中
+                },
+            });
+        } else {
+            // 没有可用客服，加入队列
+            const position = queueManager.enqueue(session);
+            const waitTime = queueManager.estimateWaitTime(position);
+
+            logger.info(`[HumanTakeover] Session ${sessionId} added to queue, position: ${position}`);
+
+            return res.json({
+                success: true,
+                message: '当前客服繁忙，请稍候...',
+                data: {
+                    sessionId,
+                    status: 'waiting_human',
+                    queuePosition: position,
+                    estimatedWaitTime: waitTime, // 秒
+                },
+            });
+        }
+
+    } catch (error) {
+        logger.error('[HumanTakeover] Request human takeover failed:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: error.message || '转人工失败',
+            error: CONFIG.env === 'development' ? error.toString() : undefined,
+        });
+    }
+});
+
+/**
+ * 客服接听会话
+ * 流程：
+ * 1. 客服点击"接听"按钮
+ * 2. 调用 TakeoverAIAgentCall API
+ * 3. 获取 RTC Token
+ * 4. 返回给客服端，客服加入 RTC 频道
+ * 5. AI 自动退出
+ */
+app.post('/api/agent-accept-call', async (req, res) => {
+    try {
+        const {
+            sessionId,
+            agentId,
+            region = CONFIG.aliyun.region,
+        } = req.body;
+
+        // 参数验证
+        if (!sessionId) {
+            return res.status(400).json({
+                success: false,
+                message: 'sessionId is required',
+            });
+        }
+
+        if (!agentId) {
+            return res.status(400).json({
+                success: false,
+                message: 'agentId is required',
+            });
+        }
+
+        logger.info('[AgentAccept] Agent accepting call:', { sessionId, agentId });
+
+        // 获取会话信息
+        const session = sessionManager.getSession(sessionId);
+
+        if (!session) {
+            return res.status(404).json({
+                success: false,
+                message: 'Session not found',
+            });
+        }
+
+        if (session.status !== 'waiting_human') {
+            return res.status(400).json({
+                success: false,
+                message: `Session status is ${session.status}, cannot accept`,
+            });
+        }
+
+        // 获取客服信息
+        const agent = agentStatusManager.getAgent(agentId);
+
+        if (!agent) {
+            return res.status(404).json({
+                success: false,
+                message: 'Agent not found',
+            });
+        }
+
+        if (agent.status !== 'online') {
+            return res.status(400).json({
+                success: false,
+                message: 'Agent is not available',
+            });
+        }
+
+        // ====================================================
+        // 方案 B：使用独立 RTC 频道替代 TakeoverAIAgentCall
+        // 创建新的 RTC 频道供用户和客服直接通话
+        // ====================================================
+
+        const humanChannelId = `HUMAN_${sessionId.replace(/-/g, '').substring(0, 24)}`;
+
+        logger.info('[AgentAccept] Creating independent RTC channel:', {
+            channelId: humanChannelId,
+            userId: session.userId,
+            agentRtcUserId: agent.rtcUserId,
+        });
+
+        // 为客服生成 RTC Token
+        const agentTokenResult = await getRTCToken({
+            channelId: humanChannelId,
+            userId: agent.rtcUserId,
+            region,
+        });
+
+        if (!agentTokenResult.success) {
+            logger.error('[AgentAccept] Failed to generate agent RTC token:', agentTokenResult);
+            return res.status(500).json({
+                success: false,
+                message: '生成客服 RTC Token 失败',
+                errorCode: agentTokenResult.errorCode,
+            });
+        }
+
+        // 为用户生成 RTC Token
+        const userTokenResult = await getRTCToken({
+            channelId: humanChannelId,
+            userId: session.userId,
+            region,
+        });
+
+        if (!userTokenResult.success) {
+            logger.error('[AgentAccept] Failed to generate user RTC token:', userTokenResult);
+            return res.status(500).json({
+                success: false,
+                message: '生成用户 RTC Token 失败',
+                errorCode: userTokenResult.errorCode,
+            });
+        }
+
+        logger.info('[AgentAccept] Independent RTC channel created successfully:', {
+            channelId: humanChannelId,
+            agentToken: 'generated',
+            userToken: 'generated',
+        });
+
+        const takeoverResult = {
+            channelId: humanChannelId,
+            token: agentTokenResult.rtcAuthToken.token,  // ✅ 使用原始 SHA256 hash，不是 base64Token
+            humanAgentUserId: agent.rtcUserId,
+            userToken: userTokenResult.rtcAuthToken.token, // ✅ 使用原始 SHA256 hash
+            agentNonce: agentTokenResult.rtcAuthToken.nonce,
+            userNonce: userTokenResult.rtcAuthToken.nonce,
+        };
+
+        // 更新会话状态
+        sessionManager.updateSession(sessionId, {
+            status: 'human_talking',
+            agentId: agentId,
+            agentName: agent.name,
+            transferredAt: new Date(),
+        });
+
+        // 更新客服状态为忙碌
+        agentStatusManager.updateStatus(agentId, 'busy', sessionId);
+
+        // 从队列中移除（如果在队列中）
+        queueManager.remove(sessionId);
+
+        // 通知用户：客服已接入（方案 B：包含新的 RTC 频道信息）
+        notifyUserTakeoverSuccess(io, session.userId, {
+            agentId,
+            name: agent.name,
+        }, {
+            channelId: takeoverResult.channelId,
+            userToken: takeoverResult.userToken,
+            userNonce: takeoverResult.userNonce,           // ✅ 新增：用户端需要的 nonce
+            timestamp: userTokenResult.timestamp,          // ✅ 新增：时间戳
+            appId: CONFIG.rtc.appId                        // ✅ 新增：RTC AppId
+        });
+
+        logger.info('[AgentAccept] Agent successfully accepted call:', {
+            sessionId,
+            agentId,
+        });
+
+        // 返回 RTC 信息给客服端
+        return res.json({
+            success: true,
+            message: '接听成功',
+            data: {
+                sessionId,
+                channelId: takeoverResult.channelId,
+                rtcToken: takeoverResult.token,
+                rtcUserId: takeoverResult.humanAgentUserId,
+                rtcAppId: CONFIG.rtc.appId,       // ✅ RTC AppId，客服端加入频道必需
+                rtcTimestamp: agentTokenResult.timestamp, // ✅ Token 有效期时间戳（秒）
+                rtcNonce: takeoverResult.agentNonce,      // ✅ nonce，必须与 Token 签名时使用的一致
+                conversationHistory: session.conversationHistory,
+                userId: session.userId,
+            },
+        });
+
+    } catch (error) {
+        logger.error('[AgentAccept] Agent accept call failed:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: error.message || '接听失败',
+            error: CONFIG.env === 'development' ? error.toString() : undefined,
+        });
+    }
+});
+
+/**
+ * 获取会话历史记录
+ * 用于客服端查看 AI 与用户的对话历史
+ */
+app.get('/api/session-history/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+
+        if (!sessionId) {
+            return res.status(400).json({
+                success: false,
+                message: 'sessionId is required',
+            });
+        }
+
+        logger.info('[SessionHistory] Getting session history:', { sessionId });
+
+        // 获取会话信息
+        const session = sessionManager.getSession(sessionId);
+
+        if (!session) {
+            return res.status(404).json({
+                success: false,
+                message: 'Session not found',
+            });
+        }
+
+        return res.json({
+            success: true,
+            data: {
+                sessionId,
+                userId: session.userId,
+                status: session.status,
+                conversationHistory: session.conversationHistory || [],
+                transferReason: session.transferReason,
+                keyword: session.keyword,
+                createdAt: session.createdAt,
+                transferredAt: session.transferredAt,
+                agentId: session.agentId,
+                agentName: session.agentName,
+            },
+        });
+
+    } catch (error) {
+        logger.error('[SessionHistory] Get session history failed:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: error.message || '获取会话历史失败',
+            error: CONFIG.env === 'development' ? error.toString() : undefined,
+        });
+    }
+});
+
 // ==================== 错误处理 ====================
 
 // 404处理
@@ -803,8 +1290,8 @@ function startServer() {
             logger.warn('ALIBABA_CLOUD_RTC_APP_ID/ALIBABA_CLOUD_RTC_APP_KEY 未配置, getRtcAuthToken 将不可用');
         }
 
-        // 启动服务器
-        app.listen(CONFIG.port, () => {
+        // 启动 HTTP 服务器（包含 WebSocket）
+        httpServer.listen(CONFIG.port, () => {
             logger.info(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
@@ -819,12 +1306,18 @@ function startServer() {
 ║    - POST /api/start-call                                 ║
 ║    - POST /api/stop-call                                  ║
 ║    - POST /api/get-token                                  ║
+║    - POST /api/request-human-takeover (新增)              ║
+║    - POST /api/agent-accept-call (新增)                   ║
+║    - GET  /api/session-history/:sessionId (新增)          ║
 ║    - GET  /api/health                                     ║
+║                                                           ║
+║    WebSocket: 已启用                                       ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
             `);
 
             logger.info(`Server is running at http://localhost:${CONFIG.port}`);
+            logger.info(`WebSocket is ready on ws://localhost:${CONFIG.port}`);
         });
 
     } catch (error) {

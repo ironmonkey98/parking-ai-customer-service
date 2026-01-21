@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>真人客服接管控制台</title>
+    <script src="https://g.alicdn.com/code/lib/aliyun-webrtc-sdk/1.12.13/index.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f0f2f5; padding-top: 50px; }
+        .console-card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .status-box { padding: 10px; border-radius: 6px; margin-bottom: 20px; font-weight: bold; }
+        .status-idle { background: #e2e3e5; color: #383d41; }
+        .status-connected { background: #d1e7dd; color: #0f5132; }
+        .status-error { background: #f8d7da; color: #842029; }
+        #remote-video { width: 100%; height: 200px; background: #000; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="console-card">
+                <h3 class="mb-4 text-center">👩‍💼 真人客服接管台</h3>
+                
+                <div id="status" class="status-box status-idle text-center">
+                    等待接入...
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted">当前频道 (Channel ID)</label>
+                    <input type="text" class="form-control" id="channelId" readonly>
+                </div>
+
+                <div id="remote-video" class="mb-4">
+                    <span>⏳ 等待客户语音流...</span>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button id="btn-join" class="btn btn-primary btn-lg" onclick="startTakeover()">
+                        📞 立即接听 (入会)
+                    </button>
+                    <button id="btn-leave" class="btn btn-danger btn-lg" onclick="leaveCall()" disabled>
+                        📴 挂断通话
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 2. 初始化 AliRtcEngine
+    const aliRtcEngine = new AliRtcEngine();
+    
+    // 从 URL 获取 FastGPT 传过来的参数
+    // URL 示例: https://your-domain.com/agent.html?token=xxx&channelId=123&userId=agent01&nonce=xxx&gslb=xxx...
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // 核心参数映射 (根据 TakeoverAIAgentCall 接口返回的字段)
+    const authInfo = {
+        appid: urlParams.get('appId') || '您的AppID', // 如果接口没返回 AppId，需在此硬编码
+        channel: urlParams.get('channelId'),
+        userid: urlParams.get('userId'),
+        token: urlParams.get('token'),
+        nonce: urlParams.get('nonce'),
+        gslb: urlParams.get('gslb') ? [urlParams.get('gslb')] : null, // gslb 必须是数组
+        timestamp: parseInt(urlParams.get('timestamp'))
+    };
+
+    // 自动填充界面
+    document.getElementById('channelId').value = authInfo.channel || '未检测到频道参数';
+
+    // ---- 核心逻辑 A: 监听事件 ----
+    
+    // 1. 监听远端用户(客户)上线
+    aliRtcEngine.on('remoteUserOnLineNotify', (userId) => {
+        updateStatus(`客户 ${userId} 已连接`, 'connected');
+    });
+
+    // 2. 监听远端用户(客户)离开
+    aliRtcEngine.on('remoteUserOffLineNotify', (userId) => {
+        updateStatus(`客户 ${userId} 已挂断`, 'idle');
+        leaveCall();
+    });
+
+    // 3. 监听并订阅音频流 (最关键的一步：听到客户声音)
+    aliRtcEngine.on('remoteStreamAvailableNotify', (userId, streamType) => {
+        console.log('收到流:', userId, streamType);
+        // 订阅音频流
+        aliRtcEngine.subscribe(userId, { audio: true, video: false }); // AI 接管通常只需要音频
+    });
+
+    // ---- 核心逻辑 B: 动作函数 ----
+
+    async function startTakeover() {
+        if (!authInfo.token || !authInfo.channel) {
+            alert('错误：URL 中缺少必要的鉴权参数 (token/channelId)');
+            return;
+        }
+
+        try {
+            updateStatus('正在入会...', 'idle');
+
+            // 1. 加入频道
+            await aliRtcEngine.joinChannel(authInfo, authInfo.channel);
+            
+            // 2. 发布本地麦克风 (让客户听到客服声音)
+            // 先获取麦克风权限
+            await aliRtcEngine.enableLocalAudio(true); 
+            // 发布
+            await aliRtcEngine.publish().catch(err => console.error("发布失败", err));
+
+            updateStatus('✅ 通话中 - 已接管', 'connected');
+            toggleButtons(true);
+            
+            // 可选：在这里播放一个“叮”的提示音
+
+        } catch (error) {
+            console.error(error);
+            updateStatus(`入会失败: ${error.message}`, 'error');
+        }
+    }
+
+    async function leaveCall() {
+        try {
+            await aliRtcEngine.leaveChannel();
+            updateStatus('已挂断', 'idle');
+            toggleButtons(false);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    // ---- 辅助函数 ----
+    function updateStatus(text, type) {
+        const el = document.getElementById('status');
+        el.innerText = text;
+        el.className = `status-box status-${type} text-center`;
+    }
+
+    function toggleButtons(isCalling) {
+        document.getElementById('btn-join').disabled = isCalling;
+        document.getElementById('btn-leave').disabled = !isCalling;
+    }
+</script>
+</body>
+</html>

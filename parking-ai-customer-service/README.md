@@ -1,33 +1,61 @@
 # 停车场智能客服系统
 
-基于阿里云 AI-RTC 技术的停车场智能语音客服H5应用,提供实时语音通话、智能问答、停车费查询、月卡办理等服务。
+基于阿里云 IMS (Intelligent Media Services) 的 AI 语音客服应用，提供**AI 智能问答**和**真人客服接管**无缝切换能力。
 
 ## 🚀 项目特色
 
-- ✅ **实时语音通话** - 基于阿里云IMS AI实时互动技术,低延迟高质量语音通话
-- ✅ **智能语音识别** - 支持零损语音断句,准确率高达95%
-- ✅ **实时字幕显示** - 双向实时字幕,对话内容可视化
-- ✅ **智能打断** - 用户可随时打断AI回复,实现自然对话
+### AI 智能客服
+- ✅ **实时语音通话** - 基于阿里云 IMS AI 实时互动技术，低延迟高质量语音通话
+- ✅ **智能语音识别** - 支持零损语音断句，准确率高达 95%
+- ✅ **实时字幕显示** - 双向实时字幕，对话内容可视化
+- ✅ **智能打断** - 用户可随时打断 AI 回复，实现自然对话
 - ✅ **停车场业务** - 停车费查询、月卡办理、车位查询、发票申请等场景
+
+### 真人客服接管 (NEW! 🎉)
+- ✅ **三种触发方式** - 用户主动点击、关键词检测、AI 智能判断
+- ✅ **无缝切换** - AI 自动退出，真人客服加入同一 RTC 频道
+- ✅ **对话历史传递** - 完整 AI 对话记录实时同步给客服
+- ✅ **客服工作台** - 独立客服端应用，支持会话管理和状态控制
+- ✅ **队列管理** - 多客服分配、排队机制、超时处理
+- ✅ **实时通信** - WebSocket 实时推送会话通知
+
+### 技术亮点
 - ✅ **响应式设计** - 完美适配移动端和桌面端
-- ✅ **现代化UI** - 简洁美观的停车场主题界面
+- ✅ **现代化 UI** - React 18 + TypeScript + Vite
+- ✅ **微服务架构** - 用户端、客服端、后端服务独立部署
 
 ## 📁 项目结构
 
 ```
 parking-ai-customer-service/
-├── index.html              # 主HTML页面
-├── css/
-│   └── style.css          # 样式文件
-├── js/
-│   ├── config.js          # 配置文件
-│   ├── api.js             # API接口封装
-│   └── app.js             # 主应用逻辑
-├── server/                # 后端服务
-│   ├── server.js          # Express服务器
-│   ├── package.json       # Node.js依赖
-│   └── .env.example       # 环境变量示例
-└── README.md              # 项目文档
+├── src/                    # 用户端 (React + TypeScript)
+│   ├── hooks/
+│   │   └── useAICall.ts   # AI 通话 + 转人工 Hook
+│   ├── App.tsx            # 主应用组件
+│   └── ...
+├── agent-client/           # 客服端 (独立项目)
+│   ├── src/
+│   │   ├── hooks/
+│   │   │   ├── useWebSocket.ts  # WebSocket 连接
+│   │   │   └── useRTCCall.ts    # RTC 通话管理
+│   │   ├── components/
+│   │   │   ├── Dashboard.tsx    # 客服控制台
+│   │   │   ├── SessionList.tsx  # 会话列表
+│   │   │   └── CallPanel.tsx    # 通话面板
+│   │   └── App.tsx
+│   └── package.json
+├── server/                 # 后端服务 (Node.js + Express)
+│   ├── managers/
+│   │   ├── SessionManager.js       # 会话管理
+│   │   ├── AgentStatusManager.js   # 客服状态
+│   │   └── QueueManager.js         # 队列管理
+│   ├── socket.js           # WebSocket 服务
+│   ├── server.js           # Express 主服务
+│   └── .env.example        # 环境变量示例
+├── CLAUDE.md               # 项目总览文档
+├── TESTING_GUIDE.md        # 测试指南
+├── start-all.sh            # 一键启动脚本
+└── stop-all.sh             # 停止服务脚本
 ```
 
 ## 🔧 技术栈
@@ -45,11 +73,48 @@ parking-ai-customer-service/
 
 ## 📦 快速开始
 
+### 方式一: 一键启动 (推荐)
+
+```bash
+# 1. 配置后端环境变量
+cp server/.env.example server/.env
+# 编辑 server/.env 填入你的阿里云配置
+
+# 2. 一键启动所有服务
+./start-all.sh
+
+# 访问应用
+# 用户端: http://localhost:5173
+# 客服端: http://localhost:5174
+```
+
+### 方式二: 手动启动
+
+```bash
+# 启动后端服务
+cd server
+npm install
+npm start
+
+# 启动用户端
+npm install
+npm run dev
+
+# 启动客服端
+cd agent-client
+npm install
+npm run dev
+```
+
+---
+
+## 🔧 详细配置
+
 ### 1. 前置条件
 
-- Node.js 14+
+- Node.js 16+
 - 阿里云账号
-- 已创建AI智能体(在阿里云IMS控制台)
+- 已创建 AI 智能体(在阿里云 IMS 控制台)
 
 ### 2. 配置阿里云
 
@@ -112,14 +177,32 @@ nano .env
 
 `.env`文件内容:
 ```env
+# 阿里云 AccessKey (必须)
 ALIBABA_CLOUD_ACCESS_KEY_ID=your_access_key_id
 ALIBABA_CLOUD_ACCESS_KEY_SECRET=your_access_key_secret
-ALIBABA_CLOUD_REGION=cn-shanghai
+
+# 区域配置 (必须与 Agent 所在区域一致)
+ALIBABA_CLOUD_REGION=cn-hangzhou
+
+# AI Agent ID
 AGENT_ID=your_agent_id
+
+# RTC 配置 (真人接管必需)
+ALIBABA_CLOUD_RTC_APP_ID=your_rtc_app_id
+ALIBABA_CLOUD_RTC_APP_KEY=your_rtc_app_key
+
+# 服务端口
 PORT=3000
+
+# 环境配置
 NODE_ENV=development
 LOG_LEVEL=info
 ```
+
+⚠️ **关键配置注意事项**:
+1. **区域一致性**: `ALIBABA_CLOUD_REGION` 必须与阿里云 IMS 控制台中 Agent 所在区域完全一致
+2. **RTC 配置**: 必须同时配置 `RTC_APP_ID` 和 `RTC_APP_KEY`，缺失会导致真人接管 API 调用失败
+3. **端口匹配**: 前端代码中默认使用 3000 端口连接后端
 
 ### 5. 配置前端
 
@@ -192,14 +275,24 @@ npm run dev
 | **快捷问题** | 一键提问常见问题 |
 | **通话时长** | 实时显示通话时长 |
 
-### 后端API
+### 后端 API
 
+#### AI 通话相关
 | 接口 | 方法 | 说明 |
 |------|------|------|
 | `/api/health` | GET | 健康检查 |
-| `/api/start-call` | POST | 启动AI通话 |
-| `/api/stop-call` | POST | 停止AI通话 |
-| `/api/get-token` | POST | 获取RTC Token |
+| `/api/start-call` | POST | 启动 AI 通话 |
+| `/api/stop-call` | POST | 停止 AI 通话 |
+| `/api/get-token` | POST | 获取 RTC Token |
+
+#### 真人接管相关
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/request-human-takeover` | POST | 用户请求转人工 |
+| `/api/agent-accept-call` | POST | 客服接听会话 |
+| `/api/session-history/:sessionId` | GET | 获取会话历史 |
+
+详细 API 文档请参考 [agent-client/README.md](./agent-client/README.md#api-接口)
 
 ## 🔐 安全注意事项
 
@@ -300,10 +393,70 @@ debug: {
 }
 ```
 
+## 🔄 真人接管功能使用
+
+### 用户端操作
+
+1. **主动转人工**: 点击通话界面的"转人工"按钮
+2. **语音触发**: 说出关键词 (人工客服、转人工、真人、投诉、人工)
+3. **AI 建议**: AI 判断需要人工处理时会弹出确认对话框
+
+### 客服端操作
+
+1. **登录**: 输入客服 ID 和昵称，点击登录
+2. **接听会话**:
+   - 等待会话列表中出现新会话通知
+   - 查看用户信息和转人工原因
+   - 点击"接入"按钮
+3. **查看历史**: 接入后可查看完整的 AI 对话历史
+4. **结束通话**: 点击"挂断"按钮，状态自动恢复为"在线"
+
+### 触发流程示意
+
+```
+┌─────────────┐
+│ 用户与AI对话 │
+└──────┬──────┘
+       │
+       ├─→ 用户点击"转人工"按钮
+       ├─→ 用户说出关键词 ("转人工", "人工客服", ...)
+       └─→ AI 发送自定义消息 (超出能力范围)
+       │
+       ↓
+┌─────────────────┐
+│ 后端保存会话信息 │
+│ 查找空闲客服     │
+└──────┬──────────┘
+       │
+       ├─→ 有空闲客服: 推送会话通知
+       └─→ 无空闲客服: 加入等待队列
+       │
+       ↓
+┌─────────────────┐
+│ 客服点击"接入"   │
+│ 调用 Takeover API│
+└──────┬──────────┘
+       │
+       ↓
+┌─────────────────┐
+│ AI 自动退出      │
+│ 客服加入RTC频道  │
+│ 真人对话开始     │
+└─────────────────┘
+```
+
 ## 📚 相关文档
 
-- [阿里云IMS官方文档](https://help.aliyun.com/zh/ims/)
-- [AI-RTC SDK API文档](https://help.aliyun.com/zh/ims/user-guide/aicallkit-web-sdk-integration)
+### 项目文档
+- [CLAUDE.md](./CLAUDE.md) - 完整项目架构和开发指南
+- [TESTING_GUIDE.md](./TESTING_GUIDE.md) - 详细测试流程和场景
+- [agent-client/README.md](./agent-client/README.md) - 客服端使用说明
+- [CONFIG_GUIDE.md](./CONFIG_GUIDE.md) - 配置详解
+
+### 阿里云文档
+- [阿里云 IMS 官方文档](https://help.aliyun.com/zh/ims/)
+- [AI-RTC SDK API 文档](https://help.aliyun.com/zh/ims/user-guide/aicallkit-web-sdk-integration)
+- [真人接管 API 文档](https://help.aliyun.com/zh/ims/user-guide/human-takeover)
 - [官方示例项目](https://github.com/MediaBox-AUIKits/AUIAICall)
 
 ## 📄 License

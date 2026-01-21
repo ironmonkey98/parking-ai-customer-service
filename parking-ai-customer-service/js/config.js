@@ -18,8 +18,15 @@ const CONFIG = {
 
     // API服务器配置
     api: {
-        // 后端服务器地址
-        baseURL: 'http://localhost:3000/api',
+        // 后端服务器地址 - 自动检测（支持局域网访问）
+        get baseURL() {
+            if (typeof window !== 'undefined') {
+                const protocol = window.location.protocol;
+                const hostname = window.location.hostname;
+                return `${protocol}//${hostname}:3000/api`;
+            }
+            return 'http://localhost:3000/api';
+        },
 
         // 接口端点
         endpoints: {
