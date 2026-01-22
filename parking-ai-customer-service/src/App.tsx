@@ -36,10 +36,27 @@ const ReceiptIcon = () => (
   </svg>
 );
 
-// i车位 Logo 图标
+// i车位 Logo 图标 - 停车位 P 字母设计
 const IparkingLogo = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c.83 0 1.5.67 1.5 1.5S12.83 8 12 8s-1.5-.67-1.5-1.5S11.17 5 12 5zm3 12h-6v-2h2v-4h-2v-2h4v6h2v2z"/>
+    <rect x="2" y="2" width="20" height="20" rx="4" fill="currentColor"/>
+    <text x="12" y="17" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#0a0f1a" fontFamily="Arial, sans-serif">P</text>
+  </svg>
+);
+
+// AI 助手头像图标 - 小i形象（客服机器人）
+const AIAvatarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor">
+    {/* 机器人头部 */}
+    <rect x="5" y="8" width="14" height="12" rx="3" fill="currentColor"/>
+    {/* 天线 */}
+    <circle cx="12" cy="4" r="2" fill="currentColor"/>
+    <rect x="11" y="5" width="2" height="4" fill="currentColor"/>
+    {/* 眼睛 */}
+    <circle cx="9" cy="13" r="1.5" fill="#0a0f1a"/>
+    <circle cx="15" cy="13" r="1.5" fill="#0a0f1a"/>
+    {/* 嘴巴 - 微笑 */}
+    <path d="M9 16.5c0 0 1.5 1.5 3 1.5s3-1.5 3-1.5" stroke="#0a0f1a" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
   </svg>
 );
 
@@ -113,9 +130,7 @@ function App() {
           <div className="idle-panel">
             <div className="ai-avatar idle">
               <div className="avatar-core">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                </svg>
+                <AIAvatarIcon />
               </div>
               <div className="avatar-ring ring-1"></div>
               <div className="avatar-ring ring-2"></div>
