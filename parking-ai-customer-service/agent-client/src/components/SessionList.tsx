@@ -88,7 +88,8 @@ export const SessionList = ({ sessions, onAccept, onReject }: SessionListProps) 
                         {msg.role === 'user' ? '👤 用户' : '🤖 AI'}:
                       </strong>{' '}
                       <span style={{
-                        wordBreak: 'break-word'
+                        wordBreak: 'break-word',
+                        color: '#333'
                       }}>
                         {msg.content.length > 100
                           ? msg.content.substring(0, 100) + '...'
