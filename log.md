@@ -1,5 +1,35 @@
 # 项目开发日志
 
+## 2026-01-22 16:28 - 更换用户端 Logo 图标
+
+### 修改内容
+- **修改**: 替换用户端（5173端口）首页的 Logo 和 AI 头像为真实 logo.png 图片
+- **原因**: 用户提供了新的品牌 Logo，需要替换原有的 SVG 占位图标
+- **位置**:
+  - `parking-ai-customer-service/src/App.tsx:6` - 导入 logo.png
+  - `parking-ai-customer-service/src/App.tsx:40-42` - IparkingLogo 组件（顶部品牌标识）
+  - `parking-ai-customer-service/src/App.tsx:45-48` - AIAvatarIcon 组件（AI 助手头像）
+  - `parking-ai-customer-service/src/assets/logo.png` - 新增品牌 Logo 图片文件（19KB）
+
+### 技术细节
+- **移除**: SVG 占位图标（停车位P字母设计、机器人头像）
+- **新增**: 使用 `<img>` 标签加载真实 logo.png 图片
+- **样式**:
+  - 顶部品牌标识: 28x28px，圆角6px
+  - AI 头像: 100% 宽高，contain 填充模式
+
+### 影响范围
+- ✅ 用户端首页视觉升级
+- ✅ 不影响任何功能逻辑
+- ✅ 不影响 AI 通话、转人工等核心功能
+
+### 风险评估
+- ✅ 低风险：仅视觉更新，无业务逻辑修改
+- ✅ 图片文件已确认存在并可访问
+- ✅ 客服端（5174）无需修改，已支持全屏自适应
+
+---
+
 ## 2026-01-09 14:00 - 项目修复
 
 ### 问题诊断

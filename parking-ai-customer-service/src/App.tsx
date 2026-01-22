@@ -3,6 +3,7 @@ import { useAICall } from './hooks/useAICall';
 import { AICallAgentState } from 'aliyun-auikit-aicall';
 import './App.css';
 import { v4 as uuidv4 } from 'uuid';
+import logoImg from './assets/logo.png';
 
 // SVG 图标组件
 const CoinIcon = () => (
@@ -36,28 +37,15 @@ const ReceiptIcon = () => (
   </svg>
 );
 
-// i车位 Logo 图标 - 停车位 P 字母设计
+// i车位 Logo 组件 - 使用真实 logo 图片
 const IparkingLogo = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-    <rect x="2" y="2" width="20" height="20" rx="4" fill="currentColor"/>
-    <text x="12" y="17" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#0a0f1a" fontFamily="Arial, sans-serif">P</text>
-  </svg>
+  <img src={logoImg} alt="i车位" width="28" height="28" style={{ borderRadius: '6px' }} />
 );
 
-// AI 助手头像图标 - 小i形象（客服机器人）
+// AI 助手头像组件 - 使用真实 logo 图片
 const AIAvatarIcon = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor">
-    {/* 机器人头部 */}
-    <rect x="5" y="8" width="14" height="12" rx="3" fill="currentColor"/>
-    {/* 天线 */}
-    <circle cx="12" cy="4" r="2" fill="currentColor"/>
-    <rect x="11" y="5" width="2" height="4" fill="currentColor"/>
-    {/* 眼睛 */}
-    <circle cx="9" cy="13" r="1.5" fill="#0a0f1a"/>
-    <circle cx="15" cy="13" r="1.5" fill="#0a0f1a"/>
-    {/* 嘴巴 - 微笑 */}
-    <path d="M9 16.5c0 0 1.5 1.5 3 1.5s3-1.5 3-1.5" stroke="#0a0f1a" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-  </svg>
+  <img src={logoImg} alt="小i" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+);
 );
 
 function App() {
