@@ -389,17 +389,16 @@ body {
 }
 
 /* ============================================
-   主内容区 - 双栏布局
+   主内容区 - 双栏布局（自适应全屏）
    ============================================ */
 .main-content {
   flex: 1;
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: minmax(320px, 400px) 1fr;
   gap: 24px;
   padding: 24px;
-  max-width: 1600px;
-  margin: 0 auto;
   width: 100%;
+  /* 移除 max-width 限制，使其填满全屏 */
 }
 
 /* ============================================
@@ -995,8 +994,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 32px;
-  max-width: 1600px;
-  margin: 0 auto;
+  /* 移除 max-width 限制 */
 }
 
 .stat-item {
