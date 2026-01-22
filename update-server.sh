@@ -2,7 +2,7 @@
 
 # ========================================
 # 云端服务器更新脚本
-# 在服务器上运行此脚本来更新项目
+# 在项目目录下运行此脚本
 # ========================================
 
 set -e  # 遇到错误立即退出
@@ -19,12 +19,9 @@ echo -e "${BLUE}  停车场 AI 客服系统 - 云端更新${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# 获取脚本所在目录作为项目目录
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_DIR="${SCRIPT_DIR}"
-
-echo -e "${YELLOW}📂 当前项目目录: ${PROJECT_DIR}${NC}"
-cd "${PROJECT_DIR}"
+# 显示当前目录
+echo -e "${YELLOW}📂 当前目录: $(pwd)${NC}"
+echo ""
 
 echo -e "${YELLOW}🔍 当前分支信息:${NC}"
 git branch
