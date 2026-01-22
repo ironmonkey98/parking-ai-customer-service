@@ -58,7 +58,6 @@ function App() {
     try {
       const result = await acceptCall(sessionId, displayAgentId);
 
-      // ✅ 调试：打印接收到的对话历史
       console.log('[Agent] Accept call result:', {
         sessionId,
         hasConversationHistory: !!result.conversationHistory,
@@ -92,11 +91,13 @@ function App() {
       hangupSession(activeCall.sessionId);
     }
     endCall();
+    setHistory([]);
     updateStatus('online');
   };
 
   const handleRemoteEnd = useCallback(() => {
     endCall();
+    setHistory([]);
     updateStatus('online');
   }, [endCall, updateStatus]);
 
@@ -109,64 +110,116 @@ function App() {
     }
   }, [activeCall?.sessionId, handleRemoteEnd, lastEndedSessionId]);
 
-
   return (
-    <div>
-      <h1>客服端工作台</h1>
-
-      <section>
-        <label>
-          客服ID
-          <input
-            value={agentId}
-            onChange={event => setAgentId(event.target.value)}
-            disabled={connected}
-          />
-        </label>
-        <label>
-          客服昵称
-          <input
-            value={agentName}
-            onChange={event => setAgentName(event.target.value)}
-            disabled={connected}
-          />
-        </label>
-      </section>
-
+    <div className="agent-app">
+      {/* 顶部导航栏 */}
       <Dashboard
         connected={connected}
         agentInfo={agentInfo}
         statusLabel={statusLabel}
         agentStatus={agentStatus}
+        agentId={agentId}
+        agentName={agentName}
+        onAgentIdChange={setAgentId}
+        onAgentNameChange={setAgentName}
         onConnect={handleConnect}
         onDisconnect={disconnect}
         onStatusChange={updateStatus}
       />
 
-      {error && <p>错误: {error}</p>}
-      {rtcError && <p>RTC错误: {rtcError}</p>}
-      <p>RTC 状态: {rtcStatus}</p>
-      {loading && <p>正在接入会话...</p>}
+      {/* 主内容区 - 双栏布局 */}
+      <main className="main-content">
+        {/* 左侧面板 - 队列区 */}
+        <div className="left-panel">
+          {/* 错误提示 */}
+          {error && (
+            <div className="error-banner">
+              <span>⚠️</span>
+              <span>{error}</span>
+            </div>
+          )}
+          {rtcError && (
+            <div className="error-banner">
+              <span>⚠️</span>
+              <span>RTC: {rtcError}</span>
+            </div>
+          )}
 
-      <SessionList sessions={pendingSessions} onAccept={handleAccept} onReject={handleReject} />
+          {/* 加载状态 */}
+          {loading && (
+            <div className="loading-state">
+              <div className="loading-spinner"></div>
+              <span>正在接入会话...</span>
+            </div>
+          )}
 
-      <CallPanel
-        activeCall={activeCall}
-        history={history}
-        isMuted={isMuted}
-        rtcStatus={rtcStatus}
-        onHangup={handleHangup}
-        onToggleMute={toggleMute}
-      />
+          {/* 待接入会话列表 */}
+          <SessionList
+            sessions={pendingSessions}
+            onAccept={handleAccept}
+            onReject={handleReject}
+          />
 
-      <section>
-        <h3>系统事件</h3>
-        <ul>
-          {events.map((item, index) => (
-            <li key={`${item}-${index}`}>{item}</li>
-          ))}
-        </ul>
-      </section>
+          {/* 系统事件日志 */}
+          <div className="panel-card">
+            <div className="panel-header">
+              <div className="panel-title">
+                <span className="panel-icon">📋</span>
+                <span>系统事件</span>
+              </div>
+            </div>
+            <div className="panel-body event-log">
+              {events.length === 0 ? (
+                <div className="empty-state">
+                  <p className="empty-text">暂无事件记录</p>
+                </div>
+              ) : (
+                <ul className="event-list">
+                  {events.slice().reverse().map((item, index) => (
+                    <li key={`${item}-${index}`} className="event-item">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 右侧面板 - 通话区 */}
+        <div className="right-panel">
+          <CallPanel
+            activeCall={activeCall}
+            history={history}
+            isMuted={isMuted}
+            rtcStatus={rtcStatus}
+            onHangup={handleHangup}
+            onToggleMute={toggleMute}
+          />
+        </div>
+      </main>
+
+      {/* 底部状态栏 */}
+      <footer className="footer-bar">
+        <div className="footer-stats">
+          <div className="stat-item">
+            <span className="stat-label">📊 今日接听</span>
+            <span className="stat-value">--</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-label">⏳ 当前排队</span>
+            <span className="stat-value">{pendingSessions.length}</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-label">⏱️ 平均时长</span>
+            <span className="stat-value">--:--</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-label">📡 RTC</span>
+            <span className="stat-value">{rtcStatus}</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -20,12 +20,6 @@ export const CallPanel = ({
 }: CallPanelProps) => {
   const [callDuration, setCallDuration] = useState(0);
 
-  // ✅ 调试：打印传入的 history
-  console.log('[CallPanel] Rendering with history:', {
-    historyLength: history?.length || 0,
-    history: history,
-  });
-
   // 通话计时器
   useEffect(() => {
     if (!activeCall || rtcStatus !== 'joined') {
@@ -47,151 +41,143 @@ export const CallPanel = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // 获取 RTC 状态样式
+  const getRtcStatusClass = () => {
+    if (rtcStatus === 'joined') return 'connected';
+    if (rtcStatus === 'joining' || rtcStatus === 'connecting') return 'connecting';
+    return 'disconnected';
+  };
+
+  const getRtcStatusText = () => {
+    switch (rtcStatus) {
+      case 'joined': return '✅ 已连接';
+      case 'joining': return '⏳ 连接中...';
+      case 'connecting': return '⏳ 连接中...';
+      case 'idle': return '⚪ 待机';
+      default: return rtcStatus;
+    }
+  };
+
+  // 空状态
   if (!activeCall) {
     return (
-      <section style={{
-        padding: '20px',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        marginTop: '20px'
-      }}>
-        <p style={{ color: '#666', textAlign: 'center' }}>当前没有接入中的会话</p>
-      </section>
+      <div className="call-panel">
+        <div className="call-header">
+          <div className="call-title">
+            <span className="call-title-icon">🎙️</span>
+            <span>当前通话</span>
+          </div>
+        </div>
+        <div className="call-empty">
+          <div className="call-empty-icon">📡</div>
+          <h3 className="call-empty-title">等待接入会话</h3>
+          <p className="call-empty-text">从左侧列表中选择一个会话进行接入</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <section style={{
-      padding: '20px',
-      border: '2px solid #4CAF50',
-      borderRadius: '8px',
-      marginTop: '20px',
-      backgroundColor: '#f9fff9'
-    }}>
-      <h3 style={{ margin: '0 0 15px 0', color: '#4CAF50' }}>
-        🎙️ 通话中
-      </h3>
-
-      {/* 会话信息 */}
-      <div style={{
-        backgroundColor: '#fff',
-        padding: '15px',
-        borderRadius: '6px',
-        marginBottom: '15px'
-      }}>
-        <p style={{ margin: '5px 0' }}>
-          <strong>会话ID:</strong> {activeCall.sessionId}
-        </p>
-        <p style={{ margin: '5px 0' }}>
-          <strong>用户ID:</strong> {activeCall.userId}
-        </p>
-        <p style={{ margin: '5px 0' }}>
-          <strong>RTC 状态:</strong>
-          <span style={{
-            color: rtcStatus === 'joined' ? '#4CAF50' : '#ff9800',
-            marginLeft: '10px'
-          }}>
-            {rtcStatus === 'joined' ? '✅ 已连接' : `⏳ ${rtcStatus}`}
-          </span>
-        </p>
-        <p style={{ margin: '5px 0' }}>
-          <strong>通话时长:</strong>
-          <span style={{
-            fontSize: '18px',
-            fontWeight: 'bold',
-            marginLeft: '10px',
-            color: '#2196F3'
-          }}>
-            {formatDuration(callDuration)}
-          </span>
-        </p>
+    <div className="call-panel">
+      {/* 通话头部 */}
+      <div className="call-header">
+        <div className="call-title">
+          <span className="call-title-icon">🎙️</span>
+          <span>通话中</span>
+        </div>
+        <div className={`rtc-status ${getRtcStatusClass()}`}>
+          {getRtcStatusText()}
+        </div>
       </div>
 
-      {/* 控制按钮 */}
-      <div style={{
-        display: 'flex',
-        gap: '10px',
-        marginBottom: '15px'
-      }}>
-        <button
-          type="button"
-          onClick={onToggleMute}
-          disabled={rtcStatus !== 'joined'}
-          style={{
-            flex: 1,
-            padding: '12px 20px',
-            fontSize: '16px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: rtcStatus === 'joined' ? 'pointer' : 'not-allowed',
-            backgroundColor: isMuted ? '#ff9800' : '#2196F3',
-            color: 'white',
-            fontWeight: 'bold',
-            opacity: rtcStatus === 'joined' ? 1 : 0.5
-          }}
-        >
-          {isMuted ? '🔇 取消静音' : '🎤 静音'}
-        </button>
+      {/* 会话信息 */}
+      <div className="call-info">
+        <div className="call-info-grid">
+          <div className="info-item">
+            <span className="info-label">会话 ID</span>
+            <span className="info-value">{activeCall.sessionId.substring(0, 12)}...</span>
+          </div>
+          <div className="info-item">
+            <span className="info-label">用户 ID</span>
+            <span className="info-value">{activeCall.userId.substring(0, 12)}...</span>
+          </div>
+          <div className="info-item">
+            <span className="info-label">频道 ID</span>
+            <span className="info-value">{activeCall.channelId?.substring(0, 12) || '--'}...</span>
+          </div>
+        </div>
+      </div>
 
-        <button
-          type="button"
-          onClick={onHangup}
-          style={{
-            flex: 1,
-            padding: '12px 20px',
-            fontSize: '16px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            backgroundColor: '#f44336',
-            color: 'white',
-            fontWeight: 'bold'
-          }}
-        >
-          📞 挂断
-        </button>
+      {/* LED 风格计时器 */}
+      <div className="call-timer">
+        <div className="timer-label">通话时长</div>
+        <div className="timer-display">{formatDuration(callDuration)}</div>
       </div>
 
       {/* 对话历史 */}
-      <div style={{
-        backgroundColor: '#1a1a2e',
-        padding: '15px',
-        borderRadius: '6px',
-        maxHeight: '300px',
-        overflowY: 'auto'
-      }}>
-        <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#fff' }}>💬 对话历史</h4>
-        {history.length === 0 ? (
-          <p style={{ color: '#999', fontSize: '14px' }}>暂无对话记录</p>
-        ) : (
-          <ul style={{
-            listStyle: 'none',
-            padding: 0,
-            margin: 0
-          }}>
-            {history.map(message => (
-              <li
+      <div className="call-history">
+        <div className="history-header">
+          <div className="history-title">
+            <span>💬</span>
+            <span>对话记录 ({history.length}条)</span>
+          </div>
+        </div>
+        <div className="history-scroll">
+          {history.length === 0 ? (
+            <div className="empty-state">
+              <p className="empty-text">暂无对话记录</p>
+            </div>
+          ) : (
+            history.map(message => (
+              <div
                 key={message.id}
-                style={{
-                  padding: '8px 12px',
-                  margin: '5px 0',
-                  borderRadius: '4px',
-                  backgroundColor: message.role === 'user' ? '#2196F3' : '#4a4a6a',
-                  fontSize: '14px',
-                  color: '#fff'
-                }}
+                className={`message-bubble ${message.role}`}
               >
-                <strong style={{
-                  color: message.role === 'user' ? '#bbdefb' : '#b0b0c0'
-                }}>
-                  {message.role === 'user' ? '👤 用户' : '🤖 AI'}:
-                </strong>{' '}
+                <div className="message-role">
+                  {message.role === 'user' ? '👤 用户' : '🤖 AI'}
+                </div>
                 {message.content}
-              </li>
-            ))}
-          </ul>
-        )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
-    </section>
+
+      {/* 通话控制按钮 */}
+      <div className="call-controls">
+        <button
+          type="button"
+          className={`btn btn-mute ${isMuted ? 'muted' : ''}`}
+          onClick={onToggleMute}
+          disabled={rtcStatus !== 'joined'}
+        >
+          {isMuted ? (
+            <>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
+              </svg>
+              取消静音
+            </>
+          ) : (
+            <>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+              </svg>
+              静音
+            </>
+          )}
+        </button>
+        <button
+          type="button"
+          className="btn btn-hangup"
+          onClick={onHangup}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.996.996 0 010-1.41C2.92 9.07 7.24 7.5 12 7.5s9.08 1.57 11.71 4.16c.39.39.39 1.03 0 1.42l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28a11.274 11.274 0 00-2.66-1.85.999.999 0 01-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
+          </svg>
+          挂断
+        </button>
+      </div>
+    </div>
   );
 };

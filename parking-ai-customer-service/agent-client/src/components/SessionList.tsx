@@ -7,150 +7,119 @@ interface SessionListProps {
 }
 
 export const SessionList = ({ sessions, onAccept, onReject }: SessionListProps) => {
-  if (sessions.length === 0) {
-    return <p>当前没有等待中的会话</p>;
-  }
+  const getReasonClass = (reason: string | undefined) => {
+    switch (reason) {
+      case 'keyword_detected': return 'keyword';
+      case 'ai_suggested': return 'ai';
+      case 'user_requested': return 'user';
+      default: return 'user';
+    }
+  };
+
+  const getReasonText = (reason: string | undefined, keyword?: string) => {
+    switch (reason) {
+      case 'keyword_detected': return `🔑 关键词: ${keyword || '未知'}`;
+      case 'ai_suggested': return '🤖 AI 建议转人工';
+      case 'user_requested': return '👤 用户主动请求';
+      default: return '❓ 未知原因';
+    }
+  };
 
   return (
-    <section>
-      <h3>等待接入的会话</h3>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {sessions.map(session => (
-          <li
-            key={session.sessionId}
-            style={{
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              padding: '15px',
-              marginBottom: '15px',
-              backgroundColor: '#fafafa'
-            }}
-          >
-            {/* 基本信息 */}
-            <div style={{ marginBottom: '10px' }}>
-              <p style={{ margin: '5px 0', fontSize: '12px', color: '#666' }}>
-                <strong>会话ID:</strong> {session.sessionId.substring(0, 8)}...
-              </p>
-              <p style={{ margin: '5px 0' }}>
-                <strong>用户ID:</strong> {session.userId.substring(0, 8)}...
-              </p>
-              <p style={{ margin: '5px 0' }}>
-                <strong>转人工原因:</strong>{' '}
-                <span style={{
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  backgroundColor: session.transferReason === 'keyword_detected' ? '#fff3e0' : '#e3f2fd',
-                  color: session.transferReason === 'keyword_detected' ? '#e65100' : '#1565c0',
-                  fontSize: '12px'
-                }}>
-                  {session.transferReason === 'user_requested' && '用户主动请求'}
-                  {session.transferReason === 'keyword_detected' && `关键词触发: ${session.keyword || ''}`}
-                  {session.transferReason === 'ai_suggested' && 'AI建议转人工'}
-                  {!session.transferReason && '未知'}
-                </span>
-              </p>
-            </div>
+    <div className="panel-card">
+      <div className="panel-header">
+        <div className="panel-title">
+          <span className="panel-icon">📞</span>
+          <span>待接入会话</span>
+        </div>
+        {sessions.length > 0 && (
+          <span className={`count-badge ${sessions.length >= 3 ? 'warning' : ''}`}>
+            {sessions.length}
+          </span>
+        )}
+      </div>
+      <div className="panel-body">
+        {sessions.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">📭</div>
+            <p className="empty-text">当前没有等待中的会话</p>
+          </div>
+        ) : (
+          <div className="session-list">
+            {sessions.map((session) => (
+              <div key={session.sessionId} className="session-card">
+                {/* 会话元信息 */}
+                <div className="session-meta">
+                  <div className="session-id">
+                    ID: {session.sessionId.substring(0, 12)}...
+                  </div>
+                  <div className="session-user">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                    <span>用户 {session.userId.substring(0, 8)}...</span>
+                  </div>
+                  <span className={`reason-tag ${getReasonClass(session.transferReason)}`}>
+                    {getReasonText(session.transferReason, session.keyword)}
+                  </span>
+                </div>
 
-            {/* ✅ 新增：AI 对话历史预览 */}
-            {session.conversationHistory && session.conversationHistory.length > 0 && (
-              <div style={{
-                backgroundColor: '#fff',
-                border: '1px solid #e0e0e0',
-                borderRadius: '6px',
-                padding: '10px',
-                marginBottom: '10px',
-                maxHeight: '150px',
-                overflowY: 'auto'
-              }}>
-                <p style={{
-                  margin: '0 0 8px 0',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  color: '#333'
-                }}>
-                  💬 AI 对话历史 ({session.conversationHistory.length} 条)
-                </p>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {session.conversationHistory.map(msg => (
-                    <li
-                      key={msg.id}
-                      style={{
-                        padding: '6px 10px',
-                        margin: '4px 0',
-                        borderRadius: '4px',
-                        backgroundColor: msg.role === 'user' ? '#e3f2fd' : '#f5f5f5',
-                        fontSize: '13px'
-                      }}
-                    >
-                      <strong style={{
-                        color: msg.role === 'user' ? '#1976d2' : '#666'
-                      }}>
-                        {msg.role === 'user' ? '👤 用户' : '🤖 AI'}:
-                      </strong>{' '}
-                      <span style={{
-                        wordBreak: 'break-word',
-                        color: '#333'
-                      }}>
-                        {msg.content.length > 100
-                          ? msg.content.substring(0, 100) + '...'
-                          : msg.content}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                {/* 对话历史预览 */}
+                {session.conversationHistory && session.conversationHistory.length > 0 ? (
+                  <div className="conversation-preview">
+                    <div className="preview-title">
+                      <span>💬</span>
+                      <span>对话记录 ({session.conversationHistory.length}条)</span>
+                    </div>
+                    <div className="preview-messages">
+                      {session.conversationHistory.slice(-3).map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`preview-msg ${msg.role}`}
+                        >
+                          <span className="role">
+                            {msg.role === 'user' ? '👤' : '🤖'}
+                          </span>
+                          {msg.content.length > 60
+                            ? msg.content.substring(0, 60) + '...'
+                            : msg.content
+                          }
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="no-history">暂无 AI 对话记录</p>
+                )}
+
+                {/* 操作按钮 */}
+                <div className="session-actions">
+                  <button
+                    type="button"
+                    className="btn btn-success"
+                    onClick={() => onAccept(session.sessionId)}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    接入
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => onReject(session.sessionId)}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                    拒绝
+                  </button>
+                </div>
               </div>
-            )}
-
-            {/* 没有对话历史时显示提示 */}
-            {(!session.conversationHistory || session.conversationHistory.length === 0) && (
-              <p style={{
-                color: '#999',
-                fontSize: '12px',
-                fontStyle: 'italic',
-                margin: '10px 0'
-              }}>
-                暂无 AI 对话记录
-              </p>
-            )}
-
-            {/* 操作按钮 */}
-            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-              <button
-                type="button"
-                onClick={() => onAccept(session.sessionId)}
-                style={{
-                  flex: 1,
-                  padding: '10px 15px',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                ✅ 接入
-              </button>
-              <button
-                type="button"
-                onClick={() => onReject(session.sessionId)}
-                style={{
-                  flex: 1,
-                  padding: '10px 15px',
-                  backgroundColor: '#f44336',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                ❌ 拒绝
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
