@@ -906,6 +906,7 @@ app.post('/api/request-human-takeover', async (req, res) => {
             reason = 'user_requested', // 'user_requested' | 'ai_suggested' | 'keyword_detected'
             keyword,
             conversationHistory = [],
+            source, // 'fastgpt' | 'user_client' | undefined
         } = req.body;
 
         // 参数验证
@@ -963,6 +964,20 @@ app.post('/api/request-human-takeover', async (req, res) => {
 
         // 保存到会话管理器
         sessionManager.saveSession(session);
+
+        // ✅ 如果请求来自 FastGPT，通过 WebSocket 通知用户端更新转人工状态
+        if (source === 'fastgpt') {
+            logger.info(`[HumanTakeover] Request from FastGPT, notifying user client: ${userId}`);
+
+            // 通知用户端：AI 已触发转人工
+            io.emit('ai-triggered-transfer', {
+                userId,
+                sessionId,
+                reason: reason,
+                message: 'AI 正在为您转接人工客服，请稍候...',
+                status: 'waiting_human',
+            });
+        }
 
         // 尝试推送给可用客服
         const pushed = pushSessionToAgent(io, session);

@@ -487,6 +487,34 @@ export const useAICall = () => {
       }]);
     });
 
+    // ✅ 监听 AI 触发的转人工事件（来自 FastGPT）
+    socket.on('ai-triggered-transfer', (data: any) => {
+      console.log('[AI Triggered Transfer] Received:', data);
+
+      // 检查是否是当前用户
+      if (data.userId && currentUserIdRef.current && data.userId !== currentUserIdRef.current) {
+        console.log('[AI Triggered Transfer] Not for current user, ignoring');
+        return;
+      }
+
+      // 更新转人工状态
+      setHumanTakeover(prev => ({
+        ...prev,
+        isWaitingHuman: true,
+        isTransferring: false,
+        sessionId: data.sessionId || null,
+        queuePosition: data.queuePosition || 0,
+        estimatedWaitTime: data.estimatedWaitTime || 0,
+      }));
+
+      // 添加系统消息
+      setMessages(prev => [...prev, {
+        id: uuidv4(),
+        role: 'ai',
+        content: data.message || 'AI 正在为您转接人工客服，请稍候...',
+      }]);
+    });
+
     // 监听客服接入成功事件（方案 B）
     socket.on('takeover-success', async (data: any) => {
       console.log('[Takeover Success] Received:', data);
