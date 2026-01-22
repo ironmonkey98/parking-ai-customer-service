@@ -4,6 +4,45 @@ import { AICallAgentState } from 'aliyun-auikit-aicall';
 import './App.css';
 import { v4 as uuidv4 } from 'uuid';
 
+// SVG 图标组件
+const CoinIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M12 6v12M9 9h6M9 15h6"/>
+  </svg>
+);
+
+const CardIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="2" y="5" width="20" height="14" rx="2"/>
+    <line x1="2" y1="10" x2="22" y2="10"/>
+  </svg>
+);
+
+const CarIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M5 17h14v-5l-2-4H7L5 12v5z"/>
+    <circle cx="7.5" cy="17.5" r="1.5"/>
+    <circle cx="16.5" cy="17.5" r="1.5"/>
+  </svg>
+);
+
+const ReceiptIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+  </svg>
+);
+
+// i车位 Logo 图标
+const IparkingLogo = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c.83 0 1.5.67 1.5 1.5S12.83 8 12 8s-1.5-.67-1.5-1.5S11.17 5 12 5zm3 12h-6v-2h2v-4h-2v-2h4v6h2v2z"/>
+  </svg>
+);
+
 function App() {
   const {
     startCall,
@@ -59,9 +98,9 @@ function App() {
       {/* 顶部品牌标识 */}
       <header className="app-header">
         <div className="brand">
-          <div className="brand-icon">🅿️</div>
+          <div className="brand-icon"><IparkingLogo /></div>
           <div className="brand-text">
-            <span className="brand-name">智慧停车</span>
+            <span className="brand-name">i车位</span>
             <span className="brand-sub">AI 客服助手</span>
           </div>
         </div>
@@ -83,24 +122,24 @@ function App() {
               <div className="avatar-ring ring-3"></div>
             </div>
 
-            <h1 className="title">您好，我是小P</h1>
-            <p className="subtitle-text">您的智能停车助手，随时为您服务</p>
+            <h1 className="title">您好，我是小i</h1>
+            <p className="subtitle-text">您的i车位智能助手，随时为您服务</p>
 
             <div className="feature-list">
               <div className="feature-item">
-                <span className="feature-icon">💰</span>
+                <span className="feature-icon"><CoinIcon /></span>
                 <span>查询停车费用</span>
               </div>
               <div className="feature-item">
-                <span className="feature-icon">🎫</span>
+                <span className="feature-icon"><CardIcon /></span>
                 <span>办理月卡优惠</span>
               </div>
               <div className="feature-item">
-                <span className="feature-icon">🚗</span>
+                <span className="feature-icon"><CarIcon /></span>
                 <span>出入场问题</span>
               </div>
               <div className="feature-item">
-                <span className="feature-icon">📄</span>
+                <span className="feature-icon"><ReceiptIcon /></span>
                 <span>开具发票</span>
               </div>
             </div>

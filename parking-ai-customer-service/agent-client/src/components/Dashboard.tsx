@@ -1,4 +1,5 @@
 import type { AgentInfo, AgentStatus } from '../types';
+import { ParkingIcon, LogOutIcon } from './Icons';
 
 interface DashboardProps {
   connected: boolean;
@@ -31,7 +32,7 @@ export const Dashboard = ({
     <header className="topbar">
       {/* 品牌标识 */}
       <div className="topbar-brand">
-        <div className="brand-icon">🅿️</div>
+        <div className="brand-icon"><ParkingIcon size="lg" /></div>
         <div className="brand-text">
           <span className="brand-title">客服工作台</span>
           <span className="brand-subtitle">Command Center</span>
@@ -116,9 +117,7 @@ export const Dashboard = ({
             className="btn btn-ghost btn-sm"
             onClick={onDisconnect}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
-            </svg>
+            <LogOutIcon size="sm" />
             退出
           </button>
         </div>

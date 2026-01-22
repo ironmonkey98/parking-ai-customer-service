@@ -1,4 +1,13 @@
 import type { SessionSummary } from '../types';
+import {
+  PhoneIncomingIcon,
+  InboxIcon,
+  MessageSquareIcon,
+  UserIcon,
+  BotIcon,
+  KeyIcon,
+  HelpCircleIcon
+} from './Icons';
 
 interface SessionListProps {
   sessions: SessionSummary[];
@@ -16,12 +25,21 @@ export const SessionList = ({ sessions, onAccept, onReject }: SessionListProps) 
     }
   };
 
-  const getReasonText = (reason: string | undefined, keyword?: string) => {
+  const getReasonIcon = (reason: string | undefined) => {
     switch (reason) {
-      case 'keyword_detected': return `🔑 关键词: ${keyword || '未知'}`;
-      case 'ai_suggested': return '🤖 AI 建议转人工';
-      case 'user_requested': return '👤 用户主动请求';
-      default: return '❓ 未知原因';
+      case 'keyword_detected': return <KeyIcon size="xs" />;
+      case 'ai_suggested': return <BotIcon size="xs" />;
+      case 'user_requested': return <UserIcon size="xs" />;
+      default: return <HelpCircleIcon size="xs" />;
+    }
+  };
+
+  const getReasonLabel = (reason: string | undefined, keyword?: string) => {
+    switch (reason) {
+      case 'keyword_detected': return `关键词: ${keyword || '未知'}`;
+      case 'ai_suggested': return 'AI 建议转人工';
+      case 'user_requested': return '用户主动请求';
+      default: return '未知原因';
     }
   };
 
@@ -29,7 +47,7 @@ export const SessionList = ({ sessions, onAccept, onReject }: SessionListProps) 
     <div className="panel-card">
       <div className="panel-header">
         <div className="panel-title">
-          <span className="panel-icon">📞</span>
+          <span className="panel-icon"><PhoneIncomingIcon size="sm" /></span>
           <span>待接入会话</span>
         </div>
         {sessions.length > 0 && (
@@ -41,7 +59,7 @@ export const SessionList = ({ sessions, onAccept, onReject }: SessionListProps) 
       <div className="panel-body">
         {sessions.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📭</div>
+            <div className="empty-icon"><InboxIcon size="xl" /></div>
             <p className="empty-text">当前没有等待中的会话</p>
           </div>
         ) : (
@@ -54,13 +72,12 @@ export const SessionList = ({ sessions, onAccept, onReject }: SessionListProps) 
                     ID: {session.sessionId.substring(0, 12)}...
                   </div>
                   <div className="session-user">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
+                    <UserIcon size="sm" />
                     <span>用户 {session.userId.substring(0, 8)}...</span>
                   </div>
                   <span className={`reason-tag ${getReasonClass(session.transferReason)}`}>
-                    {getReasonText(session.transferReason, session.keyword)}
+                    {getReasonIcon(session.transferReason)}
+                    <span>{getReasonLabel(session.transferReason, session.keyword)}</span>
                   </span>
                 </div>
 
@@ -68,7 +85,7 @@ export const SessionList = ({ sessions, onAccept, onReject }: SessionListProps) 
                 {session.conversationHistory && session.conversationHistory.length > 0 ? (
                   <div className="conversation-preview">
                     <div className="preview-title">
-                      <span>💬</span>
+                      <MessageSquareIcon size="sm" />
                       <span>对话记录 ({session.conversationHistory.length}条)</span>
                     </div>
                     <div className="preview-messages">
@@ -77,13 +94,15 @@ export const SessionList = ({ sessions, onAccept, onReject }: SessionListProps) 
                           key={msg.id}
                           className={`preview-msg ${msg.role}`}
                         >
-                          <span className="role">
-                            {msg.role === 'user' ? '👤' : '🤖'}
+                          <span className="role-icon">
+                            {msg.role === 'user' ? <UserIcon size="xs" /> : <BotIcon size="xs" />}
                           </span>
-                          {msg.content.length > 60
-                            ? msg.content.substring(0, 60) + '...'
-                            : msg.content
-                          }
+                          <span className="msg-content">
+                            {msg.content.length > 60
+                              ? msg.content.substring(0, 60) + '...'
+                              : msg.content
+                            }
+                          </span>
                         </div>
                       ))}
                     </div>

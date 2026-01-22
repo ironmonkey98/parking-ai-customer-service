@@ -6,6 +6,14 @@ import { CallPanel } from './components/CallPanel';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useRTCCall } from './hooks/useRTCCall';
 import type { ConversationMessage } from './types';
+import {
+  AlertIcon,
+  ClipboardListIcon,
+  ChartBarIcon,
+  HourglassIcon,
+  TimerIcon,
+  BroadcastIcon
+} from './components/Icons';
 
 function App() {
   const [agentId, setAgentId] = useState('agent-001');
@@ -134,13 +142,13 @@ function App() {
           {/* 错误提示 */}
           {error && (
             <div className="error-banner">
-              <span>⚠️</span>
+              <AlertIcon size="sm" />
               <span>{error}</span>
             </div>
           )}
           {rtcError && (
             <div className="error-banner">
-              <span>⚠️</span>
+              <AlertIcon size="sm" />
               <span>RTC: {rtcError}</span>
             </div>
           )}
@@ -164,7 +172,7 @@ function App() {
           <div className="panel-card">
             <div className="panel-header">
               <div className="panel-title">
-                <span className="panel-icon">📋</span>
+                <span className="panel-icon"><ClipboardListIcon size="sm" /></span>
                 <span>系统事件</span>
               </div>
             </div>
@@ -203,19 +211,19 @@ function App() {
       <footer className="footer-bar">
         <div className="footer-stats">
           <div className="stat-item">
-            <span className="stat-label">📊 今日接听</span>
+            <span className="stat-label"><ChartBarIcon size="xs" /> 今日接听</span>
             <span className="stat-value">--</span>
           </div>
           <div className="stat-item">
-            <span className="stat-label">⏳ 当前排队</span>
+            <span className="stat-label"><HourglassIcon size="xs" /> 当前排队</span>
             <span className="stat-value">{pendingSessions.length}</span>
           </div>
           <div className="stat-item">
-            <span className="stat-label">⏱️ 平均时长</span>
+            <span className="stat-label"><TimerIcon size="xs" /> 平均时长</span>
             <span className="stat-value">--:--</span>
           </div>
           <div className="stat-item">
-            <span className="stat-label">📡 RTC</span>
+            <span className="stat-label"><BroadcastIcon size="xs" /> RTC</span>
             <span className="stat-value">{rtcStatus}</span>
           </div>
         </div>
