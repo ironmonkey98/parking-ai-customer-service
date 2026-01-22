@@ -19,11 +19,12 @@ echo -e "${BLUE}  停车场 AI 客服系统 - 云端更新${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# 项目目录
-PROJECT_DIR="~/parking-ai-customer-service/parking-ai-customer-service"
+# 获取脚本所在目录作为项目目录
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_DIR="${SCRIPT_DIR}"
 
-echo -e "${YELLOW}📂 进入项目目录...${NC}"
-cd ~/parking-ai-customer-service/parking-ai-customer-service
+echo -e "${YELLOW}📂 当前项目目录: ${PROJECT_DIR}${NC}"
+cd "${PROJECT_DIR}"
 
 echo -e "${YELLOW}🔍 当前分支信息:${NC}"
 git branch
