@@ -1,0 +1,900 @@
+{
+  "nodes": [
+    {
+      "nodeId": "userGuide",
+      "name": "common:core.module.template.system_config",
+      "intro": "common:core.module.template.system_config_info",
+      "avatar": "core/workflow/template/systemConfig",
+      "flowNodeType": "userGuide",
+      "position": {
+        "x": 28.564260908736287,
+        "y": -471.06489785246794
+      },
+      "version": "481",
+      "inputs": [
+        {
+          "key": "welcomeText",
+          "renderTypeList": ["hidden"],
+          "valueType": "string",
+          "label": "core.app.Welcome Text",
+          "value": "您好！我是智慧停车场AI客服助手🚗\n\n我可以帮您：\n• 查询停车费用\n• 办理月卡/优惠\n• 处理出入场问题\n• 开具发票\n\n如需人工服务，请说"转人工"。"
+        },
+        {
+          "key": "variables",
+          "renderTypeList": ["hidden"],
+          "valueType": "any",
+          "label": "core.app.Chat Variable",
+          "value": [
+            {
+              "id": "plateNumber",
+              "key": "plateNumber",
+              "label": "车牌号",
+              "type": "input",
+              "required": false,
+              "maxLen": 10,
+              "enums": []
+            }
+          ]
+        },
+        {
+          "key": "questionGuide",
+          "valueType": "any",
+          "renderTypeList": ["hidden"],
+          "label": "core.app.Question Guide",
+          "value": {
+            "open": true,
+            "textList": ["停车费怎么算", "怎么办月卡", "扫码没反应怎么办", "转人工"]
+          }
+        },
+        {
+          "key": "tts",
+          "renderTypeList": ["hidden"],
+          "valueType": "any",
+          "label": "",
+          "value": {
+            "type": "web"
+          }
+        },
+        {
+          "key": "whisper",
+          "renderTypeList": ["hidden"],
+          "valueType": "any",
+          "label": "",
+          "value": {
+            "open": true,
+            "autoSend": true,
+            "autoTTSResponse": true
+          }
+        },
+        {
+          "key": "scheduleTrigger",
+          "renderTypeList": ["hidden"],
+          "valueType": "any",
+          "label": "",
+          "value": null
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "nodeId": "448745",
+      "name": "common:core.module.template.work_start",
+      "intro": "",
+      "avatar": "core/workflow/template/workflowStart",
+      "flowNodeType": "workflowStart",
+      "position": {
+        "x": 535.2644061635716,
+        "y": -439.9115682133198
+      },
+      "version": "481",
+      "inputs": [
+        {
+          "key": "userChatInput",
+          "renderTypeList": ["reference", "textarea"],
+          "valueType": "string",
+          "label": "workflow:user_question",
+          "required": true,
+          "toolDescription": "用户问题",
+          "debugLabel": ""
+        }
+      ],
+      "outputs": [
+        {
+          "id": "userChatInput",
+          "key": "userChatInput",
+          "label": "common:core.module.input.label.user question",
+          "type": "static",
+          "valueType": "string",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "nodeId": "xfPqhqw0IAHkLdtl",
+      "name": "问题分类",
+      "intro": "根据用户的历史记录和当前问题判断该次提问的类型。",
+      "avatar": "core/workflow/template/questionClassify",
+      "flowNodeType": "classifyQuestion",
+      "showStatus": true,
+      "position": {
+        "x": 970.8123139637407,
+        "y": -708.3239754328632
+      },
+      "version": "4.9.2",
+      "inputs": [
+        {
+          "key": "model",
+          "renderTypeList": ["selectLLMModel", "reference"],
+          "label": "common:core.module.input.label.aiModel",
+          "required": true,
+          "valueType": "string",
+          "llmModelType": "classify",
+          "value": "qwen-turbo",
+          "debugLabel": "",
+          "toolDescription": ""
+        },
+        {
+          "key": "systemPrompt",
+          "renderTypeList": ["textarea", "reference"],
+          "max": 3000,
+          "valueType": "string",
+          "label": "common:core.module.input.label.Background",
+          "description": "common:core.module.input.description.Background",
+          "placeholder": "common:core.module.input.placeholder.Classify background",
+          "value": "你是一个智慧停车场的客服助手，请判断用户的意图。\n\n注意：\n- 用户表达不满、焦虑、着急时，优先归类为"紧急/投诉"\n- 用户询问具体操作问题时，归类为"智能问答"\n- 用户明确要求人工时，归类为"直连人工"",
+          "debugLabel": "",
+          "toolDescription": ""
+        },
+        {
+          "key": "history",
+          "renderTypeList": ["numberInput", "reference"],
+          "valueType": "chatHistory",
+          "label": "common:core.module.input.label.chat history",
+          "description": "workflow:max_dialog_rounds",
+          "required": true,
+          "min": 0,
+          "max": 50,
+          "value": 6,
+          "debugLabel": "",
+          "toolDescription": ""
+        },
+        {
+          "key": "userChatInput",
+          "renderTypeList": ["reference", "textarea"],
+          "valueType": "string",
+          "label": "workflow:user_question",
+          "toolDescription": "用户输入的问题",
+          "required": true,
+          "value": ["448745", "userChatInput"],
+          "debugLabel": ""
+        },
+        {
+          "renderTypeList": ["custom"],
+          "valueType": "any",
+          "label": "",
+          "debugLabel": "",
+          "toolDescription": "",
+          "key": "agents",
+          "value": [
+            {
+              "value": "分类1：直连人工（强意图）\n关键词：人工、转接、客服、真人、呼叫\n示例：我要人工客服、帮我转人工、我要找真人",
+              "key": "human_direct"
+            },
+            {
+              "value": "分类2：紧急/投诉（需优先处理）\n关键词：投诉、举报、太慢了、急死了、什么破系统、坑人\n示例：我要投诉、你们这是什么服务、我等了半小时了",
+              "key": "urgent_complaint"
+            },
+            {
+              "value": "分类3：设备故障/紧急求助\n关键词：出不去、进不来、抬杆、开闸、坏了、卡住、扫码失败\n示例：闸机坏了、扫码没反应、车被卡住了、出不去怎么办",
+              "key": "device_emergency"
+            },
+            {
+              "value": "分类4：智能问答（常规咨询）\n关键词：多少钱、怎么收费、月卡、发票、优惠、规则、时间\n示例：停车费怎么算、月卡多少钱、怎么开发票",
+              "key": "normal_qa"
+            },
+            {
+              "value": "分类5：闲聊/打招呼\n关键词：你好、在吗、谢谢、再见、早上好\n示例：你好啊、谢谢你、拜拜",
+              "key": "greeting"
+            }
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "cqResult",
+          "key": "cqResult",
+          "required": true,
+          "label": "workflow:classification_result",
+          "valueType": "string",
+          "type": "static",
+          "valueDesc": "",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "nodeId": "greetingChat",
+      "name": "闲聊回复",
+      "intro": "处理打招呼和闲聊",
+      "avatar": "core/workflow/template/aiChat",
+      "flowNodeType": "chatNode",
+      "showStatus": true,
+      "position": {
+        "x": 1500,
+        "y": -1400
+      },
+      "version": "4.9.7",
+      "inputs": [
+        {
+          "key": "model",
+          "renderTypeList": ["settingLLMModel", "reference"],
+          "label": "common:core.module.input.label.aiModel",
+          "valueType": "string",
+          "value": "qwen-turbo"
+        },
+        {
+          "key": "isResponseAnswerText",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "value": true,
+          "valueType": "boolean"
+        },
+        {
+          "key": "systemPrompt",
+          "renderTypeList": ["textarea", "reference"],
+          "max": 3000,
+          "valueType": "string",
+          "label": "common:core.ai.Prompt",
+          "value": "你是智慧停车场的AI客服助手，亲切友好。\n\n回复要求：\n1. 简短热情（不超过30字）\n2. 自然引导用户说出需求\n3. 不要重复介绍自己\n\n示例：\n- 用户说"你好" → "您好！请问有什么可以帮您的吗？"\n- 用户说"谢谢" → "不客气，祝您停车愉快！"\n- 用户说"再见" → "再见，期待下次为您服务！""
+        },
+        {
+          "key": "history",
+          "renderTypeList": ["numberInput", "reference"],
+          "valueType": "chatHistory",
+          "label": "common:core.module.input.label.chat history",
+          "required": true,
+          "value": 3
+        },
+        {
+          "key": "userChatInput",
+          "renderTypeList": ["reference", "textarea"],
+          "valueType": "string",
+          "label": "workflow:user_question",
+          "required": true,
+          "value": ["448745", "userChatInput"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "answerText",
+          "key": "answerText",
+          "required": true,
+          "label": "common:core.module.output.label.Ai response content",
+          "valueType": "string",
+          "type": "static"
+        }
+      ]
+    },
+    {
+      "nodeId": "httpTriggerHuman",
+      "name": "触发转人工API",
+      "intro": "调用后端转人工接口",
+      "avatar": "core/workflow/template/httpRequest",
+      "flowNodeType": "httpRequest468",
+      "showStatus": true,
+      "position": {
+        "x": 2200,
+        "y": -1200
+      },
+      "version": "4.9.2",
+      "inputs": [
+        {
+          "key": "system_httpMethod",
+          "renderTypeList": ["custom"],
+          "valueType": "string",
+          "label": "",
+          "value": "POST"
+        },
+        {
+          "key": "system_httpReqUrl",
+          "renderTypeList": ["hidden"],
+          "valueType": "string",
+          "label": "",
+          "value": "https://47.237.118.74:3000/api/request-human-takeover"
+        },
+        {
+          "key": "system_httpHeader",
+          "renderTypeList": ["custom"],
+          "valueType": "any",
+          "label": "",
+          "value": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        {
+          "key": "system_httpParams",
+          "renderTypeList": ["hidden"],
+          "valueType": "any",
+          "label": "",
+          "value": []
+        },
+        {
+          "key": "system_httpJsonBody",
+          "renderTypeList": ["hidden"],
+          "valueType": "any",
+          "label": "",
+          "value": "{\n  \"instanceId\": \"{{instanceId}}\",\n  \"userId\": \"{{userId}}\",\n  \"channelId\": \"{{channelId}}\",\n  \"reason\": \"{{reason}}\",\n  \"keyword\": \"{{keyword}}\"\n}"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "system_httpResult",
+          "key": "system_httpResult",
+          "label": "HTTP响应",
+          "valueType": "any",
+          "type": "static"
+        }
+      ]
+    },
+    {
+      "nodeId": "fLfedV78iGJ6ytfL",
+      "name": "转人工安抚话术",
+      "intro": "用户明确要求转人工时的回复",
+      "avatar": "core/workflow/template/aiChat",
+      "flowNodeType": "chatNode",
+      "showStatus": true,
+      "position": {
+        "x": 1832.8493733801151,
+        "y": -1156.2107390169936
+      },
+      "version": "4.9.7",
+      "inputs": [
+        {
+          "key": "model",
+          "renderTypeList": ["settingLLMModel", "reference"],
+          "label": "common:core.module.input.label.aiModel",
+          "valueType": "string",
+          "value": "qwen-turbo"
+        },
+        {
+          "key": "isResponseAnswerText",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "value": true,
+          "valueType": "boolean"
+        },
+        {
+          "key": "systemPrompt",
+          "renderTypeList": ["textarea", "reference"],
+          "max": 3000,
+          "valueType": "string",
+          "label": "common:core.ai.Prompt",
+          "value": "你是停车场客服助手。用户请求转人工，请做以下回复：\n\n1. 确认收到请求\n2. 告知正在为用户转接人工客服\n3. 请用户稍候，不要关闭窗口\n\n回复要求：\n- 简洁友好，不超过50字\n- 不要问用户原因\n- 直接表示正在转接\n\n示例回复：\n"好的，正在为您转接人工客服，请稍候，不要关闭窗口~""
+        },
+        {
+          "key": "history",
+          "renderTypeList": ["numberInput", "reference"],
+          "valueType": "chatHistory",
+          "label": "common:core.module.input.label.chat history",
+          "required": true,
+          "value": 3
+        },
+        {
+          "key": "userChatInput",
+          "renderTypeList": ["reference", "textarea"],
+          "valueType": "string",
+          "label": "workflow:user_question",
+          "required": true,
+          "value": ["448745", "userChatInput"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "answerText",
+          "key": "answerText",
+          "required": true,
+          "label": "common:core.module.output.label.Ai response content",
+          "valueType": "string",
+          "type": "static"
+        }
+      ]
+    },
+    {
+      "nodeId": "urgentHandler",
+      "name": "紧急/投诉处理",
+      "intro": "处理投诉和紧急情况",
+      "avatar": "core/workflow/template/aiChat",
+      "flowNodeType": "chatNode",
+      "showStatus": true,
+      "position": {
+        "x": 1832,
+        "y": -800
+      },
+      "version": "4.9.7",
+      "inputs": [
+        {
+          "key": "model",
+          "renderTypeList": ["settingLLMModel", "reference"],
+          "label": "common:core.module.input.label.aiModel",
+          "valueType": "string",
+          "value": "qwen-turbo"
+        },
+        {
+          "key": "isResponseAnswerText",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "value": true,
+          "valueType": "boolean"
+        },
+        {
+          "key": "systemPrompt",
+          "renderTypeList": ["textarea", "reference"],
+          "max": 3000,
+          "valueType": "string",
+          "label": "common:core.ai.Prompt",
+          "value": "你是停车场客服助手。用户情绪激动或有投诉，请：\n\n1. 先道歉安抚（非常抱歉给您带来不便）\n2. 表示重视（我们非常重视您的反馈）\n3. 告知转人工（正在为您转接人工客服处理）\n4. 请稍候\n\n回复要求：\n- 诚恳、温和、不辩解\n- 不超过80字\n- 体现同理心\n\n示例：\n"非常抱歉给您带来不便！我们非常重视您的反馈，正在为您转接人工客服优先处理，请稍候~""
+        },
+        {
+          "key": "history",
+          "renderTypeList": ["numberInput", "reference"],
+          "valueType": "chatHistory",
+          "label": "common:core.module.input.label.chat history",
+          "required": true,
+          "value": 6
+        },
+        {
+          "key": "userChatInput",
+          "renderTypeList": ["reference", "textarea"],
+          "valueType": "string",
+          "label": "workflow:user_question",
+          "required": true,
+          "value": ["448745", "userChatInput"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "answerText",
+          "key": "answerText",
+          "required": true,
+          "label": "common:core.module.output.label.Ai response content",
+          "valueType": "string",
+          "type": "static"
+        }
+      ]
+    },
+    {
+      "nodeId": "deviceEmergency",
+      "name": "设备故障处理",
+      "intro": "处理设备故障和紧急求助，先尝试排查再转人工",
+      "avatar": "core/workflow/template/aiChat",
+      "flowNodeType": "chatNode",
+      "showStatus": true,
+      "position": {
+        "x": 1832,
+        "y": -400
+      },
+      "version": "4.9.7",
+      "inputs": [
+        {
+          "key": "model",
+          "renderTypeList": ["settingLLMModel", "reference"],
+          "label": "common:core.module.input.label.aiModel",
+          "valueType": "string",
+          "value": "qwen-turbo"
+        },
+        {
+          "key": "isResponseAnswerText",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "value": true,
+          "valueType": "boolean"
+        },
+        {
+          "key": "systemPrompt",
+          "renderTypeList": ["textarea", "reference"],
+          "max": 3000,
+          "valueType": "string",
+          "label": "common:core.ai.Prompt",
+          "value": "你是停车场客服助手。用户遇到设备问题（出不去、扫码失败、闸机故障等）。\n\n请按以下步骤处理：\n1. 先安抚（别着急，我来帮您）\n2. 给出1-2个快速排查建议：\n   - 扫码问题：请检查网络，或尝试手动输入车牌\n   - 闸机问题：请在通道等待，不要倒车\n   - 出不去：请确认是否已完成缴费\n3. 告知已通知工作人员\n\n回复要求：\n- 简洁实用，不超过80字\n- 给用户明确的操作指引\n\n示例：\n"别着急！请先确认是否已完成缴费。如已缴费仍无法出场，请在通道稍候，我已通知现场工作人员前往处理~""
+        },
+        {
+          "key": "history",
+          "renderTypeList": ["numberInput", "reference"],
+          "valueType": "chatHistory",
+          "label": "common:core.module.input.label.chat history",
+          "required": true,
+          "value": 6
+        },
+        {
+          "key": "userChatInput",
+          "renderTypeList": ["reference", "textarea"],
+          "valueType": "string",
+          "label": "workflow:user_question",
+          "required": true,
+          "value": ["448745", "userChatInput"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "answerText",
+          "key": "answerText",
+          "required": true,
+          "label": "common:core.module.output.label.Ai response content",
+          "valueType": "string",
+          "type": "static"
+        }
+      ]
+    },
+    {
+      "nodeId": "gGhBoEqj0cccZ7ow",
+      "name": "知识库搜索",
+      "intro": "调用知识库查找相关内容",
+      "avatar": "core/workflow/template/datasetSearch",
+      "flowNodeType": "datasetSearchNode",
+      "showStatus": true,
+      "position": {
+        "x": 1832.8493733801151,
+        "y": 106.9003724006242
+      },
+      "version": "4.9.2",
+      "inputs": [
+        {
+          "key": "datasets",
+          "renderTypeList": ["selectDataset", "reference"],
+          "label": "common:core.module.input.label.Select dataset",
+          "value": [],
+          "valueType": "selectDataset",
+          "required": true,
+          "valueDesc": "在FastGPT控制台选择您的停车场知识库"
+        },
+        {
+          "key": "similarity",
+          "renderTypeList": ["selectDatasetParamsModal"],
+          "label": "",
+          "value": 0.5,
+          "valueType": "number"
+        },
+        {
+          "key": "limit",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "value": 5000,
+          "valueType": "number"
+        },
+        {
+          "key": "searchMode",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "valueType": "string",
+          "value": "mixedRecall"
+        },
+        {
+          "key": "embeddingWeight",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "valueType": "number",
+          "value": 0.5
+        },
+        {
+          "key": "usingReRank",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "valueType": "boolean",
+          "value": true
+        },
+        {
+          "key": "rerankModel",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "valueType": "string",
+          "value": "qwen3-rerank"
+        },
+        {
+          "key": "rerankWeight",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "valueType": "number",
+          "value": 0.5
+        },
+        {
+          "key": "userChatInput",
+          "renderTypeList": ["reference", "textarea"],
+          "valueType": "string",
+          "label": "workflow:user_question",
+          "required": true,
+          "value": ["448745", "userChatInput"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "quoteQA",
+          "key": "quoteQA",
+          "label": "common:core.module.Dataset quote.label",
+          "type": "static",
+          "valueType": "datasetQuote"
+        }
+      ]
+    },
+    {
+      "nodeId": "rp2uX8ZwzKDAnNJJ",
+      "name": "判断器",
+      "intro": "判断知识库是否有结果",
+      "avatar": "core/workflow/template/ifelse",
+      "flowNodeType": "ifElseNode",
+      "showStatus": true,
+      "position": {
+        "x": 2562.0632357771237,
+        "y": 325.6229926354613
+      },
+      "inputs": [
+        {
+          "key": "ifElseList",
+          "renderTypeList": ["hidden"],
+          "valueType": "any",
+          "label": "",
+          "value": [
+            {
+              "condition": "AND",
+              "list": [
+                {
+                  "variable": ["gGhBoEqj0cccZ7ow", "quoteQA"],
+                  "condition": "isEmpty",
+                  "valueType": "input"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "ifElseResult",
+          "key": "ifElseResult",
+          "label": "workflow:judgment_result",
+          "valueType": "string",
+          "type": "static"
+        }
+      ]
+    },
+    {
+      "nodeId": "hCekTU8kMxlHytWb",
+      "name": "知识库无结果-转人工",
+      "intro": "知识库没有找到答案时的回复",
+      "avatar": "core/workflow/template/aiChat",
+      "flowNodeType": "chatNode",
+      "showStatus": true,
+      "position": {
+        "x": 3589.169908425706,
+        "y": -372.403508688711
+      },
+      "version": "4.9.7",
+      "inputs": [
+        {
+          "key": "model",
+          "renderTypeList": ["settingLLMModel", "reference"],
+          "label": "common:core.module.input.label.aiModel",
+          "valueType": "string",
+          "value": "qwen-turbo"
+        },
+        {
+          "key": "isResponseAnswerText",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "value": true,
+          "valueType": "boolean"
+        },
+        {
+          "key": "systemPrompt",
+          "renderTypeList": ["textarea", "reference"],
+          "max": 3000,
+          "valueType": "string",
+          "label": "common:core.ai.Prompt",
+          "value": "你是停车场客服助手。用户的问题超出了知识库范围，需要转人工。\n\n请：\n1. 诚实告知无法直接回答\n2. 告知已通知人工客服\n3. 请用户稍候\n\n回复要求：\n- 诚恳、不敷衍\n- 不超过60字\n- 不要说"根据知识库"\n\n示例：\n"抱歉，这个问题我暂时无法直接回答。已通知人工客服，请稍候~""
+        },
+        {
+          "key": "history",
+          "renderTypeList": ["numberInput", "reference"],
+          "valueType": "chatHistory",
+          "label": "common:core.module.input.label.chat history",
+          "required": true,
+          "value": 6
+        },
+        {
+          "key": "quoteQA",
+          "renderTypeList": ["settingDatasetQuotePrompt"],
+          "label": "",
+          "valueType": "datasetQuote",
+          "value": ["gGhBoEqj0cccZ7ow", "quoteQA"]
+        },
+        {
+          "key": "userChatInput",
+          "renderTypeList": ["reference", "textarea"],
+          "valueType": "string",
+          "label": "workflow:user_question",
+          "required": true,
+          "value": ["448745", "userChatInput"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "answerText",
+          "key": "answerText",
+          "required": true,
+          "label": "common:core.module.output.label.Ai response content",
+          "valueType": "string",
+          "type": "static"
+        }
+      ]
+    },
+    {
+      "nodeId": "oYdP6PKTnTM9jjnZ",
+      "name": "知识库有结果-正常回答",
+      "intro": "基于知识库内容回答用户",
+      "avatar": "core/workflow/template/aiChat",
+      "flowNodeType": "chatNode",
+      "showStatus": true,
+      "position": {
+        "x": 3555.3271554911753,
+        "y": 809.5756241088734
+      },
+      "version": "4.9.7",
+      "inputs": [
+        {
+          "key": "model",
+          "renderTypeList": ["settingLLMModel", "reference"],
+          "label": "common:core.module.input.label.aiModel",
+          "valueType": "string",
+          "value": "qwen-turbo"
+        },
+        {
+          "key": "isResponseAnswerText",
+          "renderTypeList": ["hidden"],
+          "label": "",
+          "value": true,
+          "valueType": "boolean"
+        },
+        {
+          "key": "systemPrompt",
+          "renderTypeList": ["textarea", "reference"],
+          "max": 3000,
+          "valueType": "string",
+          "label": "common:core.ai.Prompt",
+          "value": "你是停车场车道助手。请根据【引用内容】回答用户问题。\n\n【回答原则】\n1. **极简主义**：答案必须控制在 **50字以内**，直接说重点\n2. **拒绝机械**：不要说"根据查询到的信息..."，直接以"您好..."开头\n3. **实用优先**：告诉用户怎么做，而不是念规则\n4. **友好收尾**：如"还有其他问题可以继续问我~"\n\n【示例】\n问：停车费怎么算？\n答：您好！前15分钟免费，之后每小时3元，24小时封顶30元。还有问题可以继续问我~"
+        },
+        {
+          "key": "history",
+          "renderTypeList": ["numberInput", "reference"],
+          "valueType": "chatHistory",
+          "label": "common:core.module.input.label.chat history",
+          "required": true,
+          "value": 6
+        },
+        {
+          "key": "quoteQA",
+          "renderTypeList": ["settingDatasetQuotePrompt"],
+          "label": "",
+          "valueType": "datasetQuote",
+          "value": ["gGhBoEqj0cccZ7ow", "quoteQA"]
+        },
+        {
+          "key": "userChatInput",
+          "renderTypeList": ["reference", "textarea"],
+          "valueType": "string",
+          "label": "workflow:user_question",
+          "required": true,
+          "value": ["448745", "userChatInput"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "answerText",
+          "key": "answerText",
+          "required": true,
+          "label": "common:core.module.output.label.Ai response content",
+          "valueType": "string",
+          "type": "static"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "448745",
+      "target": "xfPqhqw0IAHkLdtl",
+      "sourceHandle": "448745-source-right",
+      "targetHandle": "xfPqhqw0IAHkLdtl-target-left"
+    },
+    {
+      "source": "xfPqhqw0IAHkLdtl",
+      "target": "fLfedV78iGJ6ytfL",
+      "sourceHandle": "xfPqhqw0IAHkLdtl-source-human_direct",
+      "targetHandle": "fLfedV78iGJ6ytfL-target-left"
+    },
+    {
+      "source": "xfPqhqw0IAHkLdtl",
+      "target": "urgentHandler",
+      "sourceHandle": "xfPqhqw0IAHkLdtl-source-urgent_complaint",
+      "targetHandle": "urgentHandler-target-left"
+    },
+    {
+      "source": "xfPqhqw0IAHkLdtl",
+      "target": "deviceEmergency",
+      "sourceHandle": "xfPqhqw0IAHkLdtl-source-device_emergency",
+      "targetHandle": "deviceEmergency-target-left"
+    },
+    {
+      "source": "xfPqhqw0IAHkLdtl",
+      "target": "gGhBoEqj0cccZ7ow",
+      "sourceHandle": "xfPqhqw0IAHkLdtl-source-normal_qa",
+      "targetHandle": "gGhBoEqj0cccZ7ow-target-left"
+    },
+    {
+      "source": "xfPqhqw0IAHkLdtl",
+      "target": "greetingChat",
+      "sourceHandle": "xfPqhqw0IAHkLdtl-source-greeting",
+      "targetHandle": "greetingChat-target-left"
+    },
+    {
+      "source": "gGhBoEqj0cccZ7ow",
+      "target": "rp2uX8ZwzKDAnNJJ",
+      "sourceHandle": "gGhBoEqj0cccZ7ow-source-right",
+      "targetHandle": "rp2uX8ZwzKDAnNJJ-target-left"
+    },
+    {
+      "source": "rp2uX8ZwzKDAnNJJ",
+      "target": "hCekTU8kMxlHytWb",
+      "sourceHandle": "rp2uX8ZwzKDAnNJJ-source-IF",
+      "targetHandle": "hCekTU8kMxlHytWb-target-left"
+    },
+    {
+      "source": "rp2uX8ZwzKDAnNJJ",
+      "target": "oYdP6PKTnTM9jjnZ",
+      "sourceHandle": "rp2uX8ZwzKDAnNJJ-source-ELSE",
+      "targetHandle": "oYdP6PKTnTM9jjnZ-target-left"
+    },
+    {
+      "source": "fLfedV78iGJ6ytfL",
+      "target": "httpTriggerHuman",
+      "sourceHandle": "fLfedV78iGJ6ytfL-source-right",
+      "targetHandle": "httpTriggerHuman-target-left"
+    },
+    {
+      "source": "urgentHandler",
+      "target": "httpTriggerHuman",
+      "sourceHandle": "urgentHandler-source-right",
+      "targetHandle": "httpTriggerHuman-target-left"
+    },
+    {
+      "source": "deviceEmergency",
+      "target": "httpTriggerHuman",
+      "sourceHandle": "deviceEmergency-source-right",
+      "targetHandle": "httpTriggerHuman-target-left"
+    },
+    {
+      "source": "hCekTU8kMxlHytWb",
+      "target": "httpTriggerHuman",
+      "sourceHandle": "hCekTU8kMxlHytWb-source-right",
+      "targetHandle": "httpTriggerHuman-target-left"
+    }
+  ],
+  "chatConfig": {
+    "variables": [
+      {
+        "id": "plateNumber",
+        "key": "plateNumber",
+        "label": "车牌号",
+        "type": "input",
+        "required": false,
+        "maxLen": 10
+      }
+    ],
+    "scheduledTriggerConfig": {
+      "cronString": "",
+      "timezone": "Asia/Shanghai",
+      "defaultPrompt": ""
+    }
+  }
+}
