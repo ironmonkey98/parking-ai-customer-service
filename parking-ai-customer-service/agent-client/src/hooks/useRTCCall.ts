@@ -76,16 +76,19 @@ export const useRTCCall = () => {
     attachRtcListeners();
 
     // 添加远程用户加入事件监听（用于订阅用户音频）
-    rtcEngineRef.current.on('onRemoteUserOnLineNotify', (userId: string) => {
+    // 使用 as any 绕过类型检查，因为不同版本的 SDK 事件名可能不同
+    (rtcEngineRef.current as any).on('onRemoteUserOnLineNotify', (userId: string) => {
       console.log('[RTC] Remote user joined:', userId);
-      // 订阅远程用户的音频流
-      rtcEngineRef.current?.subscribe(userId).catch((err: any) => {
-        console.error('[RTC] Failed to subscribe remote user:', err);
-      });
+      // 订阅远程用户的音频流（某些 SDK 版本可能不支持此方法）
+      if (typeof (rtcEngineRef.current as any)?.subscribe === 'function') {
+        (rtcEngineRef.current as any).subscribe(userId).catch((err: any) => {
+          console.error('[RTC] Failed to subscribe remote user:', err);
+        });
+      }
     });
 
     // 添加错误监听
-    rtcEngineRef.current.on('onError', (error: any) => {
+    (rtcEngineRef.current as any).on('onError', (error: any) => {
       console.error('[RTC] Error occurred:', error);
       setRtcError(error.message || 'RTC 通话出现错误');
     });
