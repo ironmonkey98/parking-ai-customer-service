@@ -46,7 +46,6 @@ const IparkingLogo = () => (
 const AIAvatarIcon = () => (
   <img src={logoImg} alt="小i" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
 );
-);
 
 function App() {
   const {
