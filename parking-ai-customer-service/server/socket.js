@@ -171,6 +171,7 @@ function initWebSocket(httpServer) {
       console.log(`[WebSocket] Agent hangup: ${sessionId}`);
 
       const agent = agentStatusManager.getAgentBySocketId(socket.id);
+      const session = sessionManager.getSession(sessionId);
 
       if (agent) {
         // 更新客服状态为空闲
@@ -179,11 +180,54 @@ function initWebSocket(httpServer) {
         // 更新会话状态
         sessionManager.updateSession(sessionId, {
           status: 'ended',
-          endedAt: new Date()
+          endedAt: new Date(),
+          endedBy: 'agent'
         });
 
-        // 通知用户端
+        // ✅ 通知用户端：客服已挂断
+        if (session && session.userId) {
+          io.emit('session-ended-by-agent', {
+            sessionId,
+            userId: session.userId,
+            agentId: agent.agentId,
+            agentName: agent.name,
+            message: '客服已结束通话'
+          });
+          console.log(`[WebSocket] Notified user ${session.userId} that agent hung up`);
+        }
+
+        // 通知所有客服端会话已结束
         io.emit('session-ended', { sessionId });
+      }
+    });
+
+    // ✅ 新增：用户挂断通话
+    socket.on('user-hangup', ({ sessionId, userId }) => {
+      console.log(`[WebSocket] User hangup: ${sessionId}, userId: ${userId}`);
+
+      const session = sessionManager.getSession(sessionId);
+
+      if (session) {
+        // 更新会话状态
+        sessionManager.updateSession(sessionId, {
+          status: 'ended',
+          endedAt: new Date(),
+          endedBy: 'user'
+        });
+
+        // 通知客服端：用户已挂断
+        io.emit('session-ended-by-user', {
+          sessionId,
+          userId,
+          message: '用户已挂断通话'
+        });
+        console.log(`[WebSocket] Notified agents that user ${userId} hung up`);
+
+        // 如果有分配的客服，恢复其在线状态
+        if (session.agentId) {
+          agentStatusManager.updateStatus(session.agentId, 'online');
+          console.log(`[WebSocket] Agent ${session.agentId} status restored to online`);
+        }
       }
     });
 

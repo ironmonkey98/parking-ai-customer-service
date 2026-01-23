@@ -94,6 +94,14 @@ export const useWebSocket = () => {
       pushEvent(payload.message || `会话超时: ${payload.sessionId}`);
     });
 
+    // ✅ 新增：监听用户挂断事件
+    socket.on('session-ended-by-user', (payload: { sessionId: string; userId: string; message: string }) => {
+      console.log('[WebSocket] User ended session:', payload);
+      removeSession(payload.sessionId);
+      setLastEndedSessionId(payload.sessionId);
+      pushEvent(payload.message || `用户已挂断: ${payload.sessionId}`);
+    });
+
     // 监听会话消息更新（智能体回调推送的实时对话）
     socket.on('session-message-update', ({ sessionId, message }: { sessionId: string; message: any }) => {
       setPendingSessions(prev => prev.map(s => {

@@ -370,19 +370,44 @@ export const useAICall = () => {
         isHumanCallActiveRef.current = false;
       });
 
-      (rtcClient as any).on('onRemoteUserOnLineNotify', (remoteUserId: string) => {
-        console.log('[RTC] Remote user online:', remoteUserId);
+      (rtcClient as any).on('onRemoteUserOnLineNotify', async (remoteUserId: string) => {
+        console.log('[RTC] User: Remote user (agent) online:', remoteUserId);
 
-        // 订阅远程音频流（客服的声音）
-        if (typeof (rtcClient as any).subscribe === 'function') {
-          (rtcClient as any).subscribe(remoteUserId).catch((err: any) => {
-            console.error('[RTC] Failed to subscribe:', err);
-          });
+        // ✅ 订阅远程音频流（客服的声音）
+        try {
+          if (typeof (rtcClient as any).subscribe === 'function') {
+            await (rtcClient as any).subscribe(remoteUserId, { audio: true, video: false });
+            console.log('[RTC] User: Successfully subscribed to agent audio');
+          }
+        } catch (err: any) {
+          console.error('[RTC] User: Failed to subscribe to agent:', err);
+        }
+      });
+
+      // ✅ 新增：监听远程用户离开（客服挂断）
+      (rtcClient as any).on('onRemoteUserOffLineNotify', (remoteUserId: string) => {
+        console.log('[RTC] User: Remote user (agent) offline:', remoteUserId);
+        // 客服离开了频道，结束通话
+        setMessages(prev => [...prev, {
+          id: uuidv4(),
+          role: 'ai',
+          content: '客服已离开通话',
+        }]);
+      });
+
+      // ✅ 新增：监听音频轨道，确保播放
+      (rtcClient as any).on('onAudioTrack', (track: any, userId: string) => {
+        console.log('[RTC] User: Received audio track from agent:', userId);
+        try {
+          track.play();
+          console.log('[RTC] User: Playing agent audio');
+        } catch (err) {
+          console.error('[RTC] User: Failed to play audio track:', err);
         }
       });
 
       (rtcClient as any).on('onError', (error: any) => {
-        console.error('[RTC] Error:', error);
+        console.error('[RTC] User: Error:', error);
         setError('与客服通话出现错误: ' + (error.message || '未知错误'));
       });
 
@@ -515,6 +540,50 @@ export const useAICall = () => {
       }]);
     });
 
+    // ✅ 新增：监听客服挂断事件
+    socket.on('session-ended-by-agent', (data: any) => {
+      console.log('[WebSocket] Agent ended session:', data);
+
+      // 检查是否是当前用户
+      if (data.userId && currentUserIdRef.current && data.userId !== currentUserIdRef.current) {
+        console.log('[WebSocket] Not for current user, ignoring');
+        return;
+      }
+
+      // 断开 RTC 连接
+      if (humanRtcClientRef.current) {
+        try {
+          humanRtcClientRef.current.leaveChannel();
+          humanRtcClientRef.current = null;
+          isHumanCallActiveRef.current = false;
+        } catch (err) {
+          console.warn('[WebSocket] Failed to leave channel on agent hangup:', err);
+        }
+      }
+
+      // 重置转人工状态
+      setHumanTakeover({
+        isTransferring: false,
+        isWaitingHuman: false,
+        sessionId: null,
+        queuePosition: 0,
+        estimatedWaitTime: 0,
+      });
+
+      // 重置通话状态
+      setCallState('ended');
+
+      // 重置频道切换标记
+      isSwitchingChannelRef.current = false;
+
+      // 显示提示消息
+      setMessages(prev => [...prev, {
+        id: uuidv4(),
+        role: 'ai',
+        content: data.message || '客服已结束通话，感谢您的咨询！',
+      }]);
+    });
+
     // 监听客服接入成功事件（方案 B）
     socket.on('takeover-success', async (data: any) => {
       console.log('[Takeover Success] Received:', data);
@@ -613,6 +682,15 @@ export const useAICall = () => {
   }, []); // ✅ 空依赖数组，只在组件挂载时创建一次连接
 
   const endCall = useCallback(async () => {
+    // ✅ 0. 通知后端用户已挂断（如果有活跃会话）
+    if (humanTakeover.sessionId && socketRef.current) {
+      console.log('[EndCall] Notifying server: user hangup');
+      socketRef.current.emit('user-hangup', {
+        sessionId: humanTakeover.sessionId,
+        userId: currentUserIdRef.current,
+      });
+    }
+
     // 1. 断开 AI 通话引擎
     if (engine) {
       await engine.handup();
@@ -631,12 +709,7 @@ export const useAICall = () => {
       }
     }
 
-    // 3. 断开 WebSocket
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
-
-    // 4. 重置状态
+    // 3. 重置转人工状态（但不断开 WebSocket，保持连接以便接收通知）
     setHumanTakeover({
       isTransferring: false,
       isWaitingHuman: false,
@@ -644,7 +717,10 @@ export const useAICall = () => {
       queuePosition: 0,
       estimatedWaitTime: 0,
     });
-  }, [engine]);
+
+    // 重置频道切换标记
+    isSwitchingChannelRef.current = false;
+  }, [engine, humanTakeover.sessionId]);
 
   return {
     engine,

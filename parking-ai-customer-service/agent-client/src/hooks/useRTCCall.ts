@@ -77,13 +77,34 @@ export const useRTCCall = () => {
 
     // 添加远程用户加入事件监听（用于订阅用户音频）
     // 使用 as any 绕过类型检查，因为不同版本的 SDK 事件名可能不同
-    (rtcEngineRef.current as any).on('onRemoteUserOnLineNotify', (userId: string) => {
-      console.log('[RTC] Remote user joined:', userId);
-      // 订阅远程用户的音频流（某些 SDK 版本可能不支持此方法）
-      if (typeof (rtcEngineRef.current as any)?.subscribe === 'function') {
-        (rtcEngineRef.current as any).subscribe(userId).catch((err: any) => {
-          console.error('[RTC] Failed to subscribe remote user:', err);
-        });
+    (rtcEngineRef.current as any).on('onRemoteUserOnLineNotify', async (userId: string) => {
+      console.log('[RTC] Agent: Remote user (customer) joined:', userId);
+      // ✅ 订阅远程用户的音频流
+      try {
+        if (typeof (rtcEngineRef.current as any)?.subscribe === 'function') {
+          await (rtcEngineRef.current as any).subscribe(userId, { audio: true, video: false });
+          console.log('[RTC] Agent: Successfully subscribed to customer audio');
+        }
+      } catch (err: any) {
+        console.error('[RTC] Agent: Failed to subscribe to customer:', err);
+      }
+    });
+
+    // ✅ 新增：监听远程用户离开（用户挂断）
+    (rtcEngineRef.current as any).on('onRemoteUserOffLineNotify', (userId: string) => {
+      console.log('[RTC] Agent: Remote user (customer) left:', userId);
+      // 用户离开了频道，可以触发结束通话
+      setRtcStatus('ending');
+    });
+
+    // ✅ 新增：监听音频轨道，确保播放
+    (rtcEngineRef.current as any).on('onAudioTrack', (track: any, userId: string) => {
+      console.log('[RTC] Agent: Received audio track from customer:', userId);
+      try {
+        track.play();
+        console.log('[RTC] Agent: Playing customer audio');
+      } catch (err) {
+        console.error('[RTC] Agent: Failed to play audio track:', err);
       }
     });
 
