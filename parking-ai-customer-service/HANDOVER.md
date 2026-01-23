@@ -615,8 +615,8 @@ parking-ai-customer-service/
 parking-ai-customer-service/
 ├── start-all.sh                  # 一键启动所有服务
 ├── stop-all.sh                   # 停止所有服务
+├── restart-all.sh                # 重启所有服务
 ├── check-status.sh               # 检查服务状态
-├── view-logs.sh                  # 查看日志
 └── generate-certs.sh             # 生成 HTTPS 证书
 ```
 

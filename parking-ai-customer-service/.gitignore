@@ -24,4 +24,17 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Environment
 server/.env
+
+# Backup files
+*.bak
+
+# Certificates (self-signed)
+certs/*.pem
+certs/*.key
+certs/*.crt
+
+# Archive
+.archive/

@@ -61,15 +61,14 @@ parking-ai-customer-service/
 ## 🔧 技术栈
 
 ### 前端
-- **HTML5** - 语义化标签
-- **CSS3** - 现代化样式,支持动画和响应式
-- **原生JavaScript** - 无框架依赖,轻量高效
-- **阿里云AI-RTC SDK** - `aliyun-auikit-aicall@2.9.1`
+- **React 18** + **TypeScript** - 现代化前端框架
+- **Vite 4.4** - 快速开发构建工具
+- **阿里云 AI-RTC SDK** - `aliyun-auikit-aicall` + `aliyun-rtc-sdk`
 
 ### 后端
-- **Node.js** - 服务器运行环境
-- **Express** - Web框架
-- **阿里云IMS SDK** - `@alicloud/ice20201109`
+- **Node.js** + **Express 4.18** - 服务器框架
+- **Socket.IO 4.8** - WebSocket 实时通信
+- **阿里云 IMS SDK** - `@alicloud/ice20201109`
 
 ## 📦 快速开始
 
