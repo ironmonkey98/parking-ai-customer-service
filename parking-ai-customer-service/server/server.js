@@ -759,15 +759,19 @@ app.post('/api/start-call', async (req, res) => {
             type,
         });
 
-        // 构造运行时配置 (如果 GenerateAIAgentCall 支持 AgentConfig)
-        // 注意: GenerateAIAgentCall 的参数结构与 StartAIAgentInstance 不同
-        // 这里我们主要确保核心通话功能可用
+        // 第一次调用获取 instanceId 和 channelId
         const result = await generateAIAgentCall({
             userId,
             agentId,
             region,
-            // 尝试将配置作为 AgentConfig 传递 (具体结构需参考阿里云文档)
-            // 暂时只传基础参数以确保连通性
+            // 传递 userData 给 FastGPT，包含用户标识信息
+            // 注意：instanceId 和 channelId 在首次调用时还不知道
+            // 所以先传 userId，后续通过其他方式关联
+            userData: {
+                userId: userId,
+                // instanceId 和 channelId 会在响应后才知道
+                // FastGPT 可以通过 userId 来识别用户
+            },
         });
 
         if (result.code !== 200) {
@@ -783,6 +787,20 @@ app.post('/api/start-call', async (req, res) => {
             instanceId: result.instanceId,
             rtcChannelId: result.channelId,
         });
+
+        // ✅ 保存通话信息到 SessionManager，用于后续 FastGPT 转人工查询
+        // 此时创建一个 "预会话"，状态为 ai_talking
+        const preSessionId = `ai_${result.instanceId}`;
+        sessionManager.saveSession({
+            sessionId: preSessionId,
+            instanceId: result.instanceId,
+            channelId: result.channelId,
+            userId: userId,
+            status: 'ai_talking',  // AI 正在通话中
+            conversationHistory: [],
+            createdAt: new Date(),
+        });
+        logger.info('[StartCall] Pre-session saved for userId:', userId);
 
         res.json({
             rtcChannelId: result.channelId,
@@ -896,10 +914,11 @@ app.post('/api/get-token', async (req, res) => {
  * 1. 用户主动点击"转人工"按钮
  * 2. 关键词触发
  * 3. AI 智能判断建议转人工
+ * 4. FastGPT 工作流触发（只传 userId）
  */
 app.post('/api/request-human-takeover', async (req, res) => {
     try {
-        const {
+        let {
             instanceId,
             userId,
             channelId,
@@ -909,14 +928,8 @@ app.post('/api/request-human-takeover', async (req, res) => {
             source, // 'fastgpt' | 'user_client' | undefined
         } = req.body;
 
-        // 参数验证
-        if (!instanceId) {
-            return res.status(400).json({
-                success: false,
-                message: 'instanceId is required',
-            });
-        }
-
+        // ✅ 核心修改：userId 是唯一必需参数
+        // 如果缺少 instanceId 或 channelId，尝试从会话中查找
         if (!userId) {
             return res.status(400).json({
                 success: false,
@@ -924,11 +937,34 @@ app.post('/api/request-human-takeover', async (req, res) => {
             });
         }
 
-        if (!channelId) {
-            return res.status(400).json({
-                success: false,
-                message: 'channelId is required',
-            });
+        // ✅ 如果 instanceId 或 channelId 缺失，通过 userId 查找
+        if (!instanceId || !channelId) {
+            logger.info('[HumanTakeover] Missing instanceId/channelId, looking up by userId:', userId);
+
+            const existingSession = sessionManager.getSessionByUserId(userId);
+
+            if (existingSession) {
+                instanceId = instanceId || existingSession.instanceId;
+                channelId = channelId || existingSession.channelId;
+
+                // 如果会话中有对话历史，合并使用
+                if (existingSession.conversationHistory && existingSession.conversationHistory.length > 0) {
+                    conversationHistory = existingSession.conversationHistory;
+                }
+
+                logger.info('[HumanTakeover] Found session for userId:', {
+                    userId,
+                    instanceId,
+                    channelId,
+                    historyCount: conversationHistory.length,
+                });
+            } else {
+                logger.warn('[HumanTakeover] No session found for userId:', userId);
+                return res.status(400).json({
+                    success: false,
+                    message: `No active session found for userId: ${userId}. Please ensure the user has an active AI call.`,
+                });
+            }
         }
 
         logger.info('[HumanTakeover] User requested human takeover:', {
@@ -936,15 +972,9 @@ app.post('/api/request-human-takeover', async (req, res) => {
             userId,
             reason,
             keyword,
-            conversationHistoryCount: conversationHistory?.length || 0, // ✅ 调试：打印对话历史数量
+            conversationHistoryCount: conversationHistory?.length || 0,
+            source,
         });
-
-        // 调试：打印对话历史内容
-        if (conversationHistory && conversationHistory.length > 0) {
-            logger.debug('[HumanTakeover] Conversation history:', JSON.stringify(conversationHistory, null, 2));
-        } else {
-            logger.warn('[HumanTakeover] No conversation history received!');
-        }
 
         // 生成会话 ID
         const sessionId = uuidv4();

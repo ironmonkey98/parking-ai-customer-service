@@ -58,6 +58,21 @@ class SessionManager {
   }
 
   /**
+   * 根据 userId 获取活跃会话
+   * 用于 FastGPT 转人工时只传 userId 的场景
+   * @param {string} userId - 用户 ID
+   * @returns {Object|null} 会话对象或 null
+   */
+  getSessionByUserId(userId) {
+    for (const session of this.sessions.values()) {
+      if (session.userId === userId && session.status !== 'ended') {
+        return session;
+      }
+    }
+    return null;
+  }
+
+  /**
    * 根据 userSocketId 获取会话
    * 用于用户断开连接时清理会话
    * @param {string} socketId - 用户的 Socket ID
