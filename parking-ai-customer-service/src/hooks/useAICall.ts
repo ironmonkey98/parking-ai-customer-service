@@ -669,15 +669,12 @@ export const useAICall = () => {
       }
     });
 
-    // 不在 cleanup 中立即断开，让连接保持稳定
+    // 不在 cleanup 中断开 WebSocket，让连接保持稳定
+    // WebSocket 连接应该在整个应用生命周期内保持，只在页面卸载时断开
     return () => {
-      // 延迟断开，避免 StrictMode 双重挂载导致的问题
-      setTimeout(() => {
-        if (socketRef.current === socket) {
-          console.log('[WebSocket] Cleanup: disconnecting');
-          socket.disconnect();
-        }
-      }, 100);
+      // 不要在 cleanup 中断开 WebSocket，因为 React StrictMode 会导致双重挂载
+      // WebSocket 会在页面关闭时自动断开
+      console.log('[WebSocket] Cleanup called, but keeping connection alive');
     };
   }, []); // ✅ 空依赖数组，只在组件挂载时创建一次连接
 
